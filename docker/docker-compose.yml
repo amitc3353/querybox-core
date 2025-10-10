@@ -25,7 +25,7 @@ services:
     image: dpage/pgadmin4:latest
     container_name: querybox-pgadmin
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@querybox.local
+      PGADMIN_DEFAULT_EMAIL: admin@querybox.dev
       PGADMIN_DEFAULT_PASSWORD: admin123
       PGADMIN_CONFIG_SERVER_MODE: 'False'
       PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
@@ -37,6 +37,8 @@ services:
       - querybox-network
     volumes:
       - pgadmin_data:/var/lib/pgadmin
+      - ./pgadmin/pgadmin-servers.json:/pgadmin4/servers.json:ro
+      - ./pgadmin/pgpassfile:/tmp/pgpassfile:ro
 
   redis:
     image: redis:7-alpine
