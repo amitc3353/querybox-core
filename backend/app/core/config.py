@@ -29,6 +29,16 @@ class Settings(BaseSettings):
     MAX_FILE_SIZE: int = 30 * 1024 * 1024  # 30MB
     LARGE_FILE_THRESHOLD: int = 10 * 1024 * 1024  # 10MB
     
+    # Local storage (Week 1)
+    STORAGE_PATH: str = "storage"
+    
+    # Allowed file extensions (from CLAUDE.md)
+    ALLOWED_EXTENSIONS: List[str] = [
+        ".pdf", ".docx", ".xlsx", ".pptx", 
+        ".txt", ".md", ".html", ".csv", 
+        ".json", ".xml"
+    ]
+    
     # Processing
     CELERY_BROKER_URL: str = "redis://localhost:6379/1"
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/2"
