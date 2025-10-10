@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "QueryBox Core"
     
     # Database
-    DATABASE_URL: str = "postgresql://querybox:password@localhost:5432/querybox"
+    DATABASE_URL: str = "postgresql://querybox:querybox_dev_2024@localhost:5432/querybox_core"
     
     # Redis
     REDIS_URL: str = "redis://localhost:6379"
