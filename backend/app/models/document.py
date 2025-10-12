@@ -78,8 +78,8 @@ class Document(Base):
     current_version = Column(Integer, nullable=False, default=1)
     mutation_count = Column(Integer, nullable=False, default=1)
     
-    # Metadata
-    metadata = Column(JSONB, default={})
+    # Document metadata
+    document_metadata = Column(JSONB, default={})
     tags = Column(ARRAY(Text))
     
     # Processing timestamps

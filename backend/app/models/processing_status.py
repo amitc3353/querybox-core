@@ -44,8 +44,8 @@ class ProcessingStatus(Base):
     attempt_number = Column(Integer, nullable=False, default=1)
     max_attempts = Column(Integer, nullable=False, default=3)
     
-    # Metadata
-    metadata = Column(JSONB, default={})
+    # Processing metadata
+    status_metadata = Column(JSONB, default={})
     
     # Audit
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())

@@ -37,7 +37,7 @@ class DocumentVersion(Base):
     storage_region = Column(String(50))
     
     # Version-specific metadata
-    metadata = Column(JSONB, default={})
+    version_metadata = Column(JSONB, default={})
     
     # Version lifecycle
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())

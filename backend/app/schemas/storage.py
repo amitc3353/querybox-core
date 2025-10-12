@@ -6,7 +6,7 @@ Defines data models for storage operations, results, and configuration.
 """
 
 from enum import Enum
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from datetime import datetime
 from uuid import UUID
 from pydantic import BaseModel, Field
