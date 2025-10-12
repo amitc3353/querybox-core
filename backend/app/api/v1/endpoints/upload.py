@@ -1,176 +1,223 @@
 """
-Upload endpoint - Week 1, Day 2
-Basic file upload with validation and database integration
+Upload endpoint - Week 1, Day 2 + Day 3, Step 5
+Enhanced file upload with StorageManager integration
 """
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
-import os
-import shutil
-import hashlib
+from sqlalchemy.exc import SQLAlchemyError
 import magic
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 import logging
-from typing import Dict
+from typing import Optional
+from uuid import UUID, uuid4
 
 from app.core.config import settings
+from app.core.storage_config import storage_settings
 from app.db.database import get_db
 from app.models.document import Document, DocumentStatusEnum, StorageProviderEnum
+from app.services.storage import StorageManager
+from app.services.storage.exceptions import StorageException, StorageQuotaExceeded
+from app.schemas.storage import StorageResult
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# MIME type mapping for allowed extensions
-ALLOWED_MIME_TYPES = {
-    'application/pdf': ['.pdf'],
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
-    'application/vnd.openxmlformats-officedocument.presentationml.presentation': ['.pptx'],
-    'text/plain': ['.txt'],
-    'text/markdown': ['.md'],
-    'text/html': ['.html'],
-    'text/csv': ['.csv'],
-    'application/json': ['.json'],
-    'application/xml': ['.xml'],
-    'text/xml': ['.xml']
-}
+def get_storage_manager(db: Session = Depends(get_db)) -> StorageManager:
+    """Dependency to provide StorageManager instance"""
+    return StorageManager(db)
 
 
 @router.post("/")
 async def upload_document(
     file: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    workspace_id: Optional[str] = None,  # For future multi-tenant support
+    db: Session = Depends(get_db),
+    storage: StorageManager = Depends(get_storage_manager)
 ):
     """
-    Upload a single document
-    Day 2, Step 3: Basic Upload Handler with database
-    Day 2, Step 4: File Validation with MIME type
+    Upload a single document with enhanced storage management
+    Day 3, Step 5: StorageManager integration with atomic operations
     
-    - Validates file size (30MB limit)
-    - Checks allowed file extensions
-    - Verifies MIME type
-    - Saves to local storage/uploads/
-    - Creates database record
-    - Returns document ID and status
+    Features:
+    - Advanced file validation (size, extension, MIME type)
+    - Organized storage with conflict resolution
+    - Atomic operations with rollback on failure
+    - Comprehensive error handling and logging
+    - Database integration with audit trail
     """
+    document_id = uuid4()
+    temp_storage_result = None
+    
     try:
-        # Step 4: File Validation - Size check
+        # Convert workspace_id to UUID (use default for MVP)
+        if workspace_id:
+            workspace_uuid = UUID(workspace_id)
+        else:
+            # Default workspace for MVP (single-tenant)
+            workspace_uuid = UUID("00000000-0000-0000-0000-000000000000")
+        
+        # Step 1: Basic validation
         if file.size > settings.MAX_FILE_SIZE:
             raise HTTPException(
                 status_code=413,
-                detail=f"File size exceeds maximum allowed size of {settings.MAX_FILE_SIZE / (1024 * 1024)}MB"
+                detail=f"File size exceeds maximum allowed size of {settings.MAX_FILE_SIZE / (1024 * 1024):.1f}MB"
             )
         
-        # Step 4: File Validation - Extension check
+        # Step 2: Extension validation
         file_extension = Path(file.filename).suffix.lower()
         if file_extension not in settings.ALLOWED_EXTENSIONS:
             raise HTTPException(
                 status_code=400,
-                detail=f"File type {file_extension} not allowed. Allowed types: {', '.join(settings.ALLOWED_EXTENSIONS)}"
+                detail=f"File type '{file_extension}' not allowed. Allowed types: {', '.join(settings.ALLOWED_EXTENSIONS)}"
             )
         
-        # Create uploads directory if it doesn't exist
-        upload_dir = Path(settings.STORAGE_PATH) / "uploads"
-        upload_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Generate unique filename with timestamp
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        safe_filename = f"{timestamp}_{file.filename}"
-        file_path = upload_dir / safe_filename
-        
-        # Step 3: Save file to local storage temporarily
+        # Step 3: MIME type validation
         file_content = await file.read()
-        with file_path.open("wb") as buffer:
-            buffer.write(file_content)
-        
-        # Step 4: MIME type verification
         mime = magic.Magic(mime=True)
-        detected_mime = mime.from_file(str(file_path))
         
-        # Verify MIME type matches expected
-        valid_mime = False
-        for allowed_mime, extensions in ALLOWED_MIME_TYPES.items():
-            if detected_mime == allowed_mime and file_extension in extensions:
-                valid_mime = True
-                break
+        # Create temporary file for MIME detection
+        temp_path = f"/tmp/upload_validation_{document_id}"
+        with open(temp_path, "wb") as temp_file:
+            temp_file.write(file_content)
         
-        if not valid_mime:
-            # Remove the file if MIME type doesn't match
-            file_path.unlink()
+        try:
+            detected_mime = mime.from_file(temp_path)
+        finally:
+            # Clean up temp validation file
+            Path(temp_path).unlink(missing_ok=True)
+        
+        # Verify MIME type is in allowed list
+        if detected_mime not in storage_settings.ALLOWED_MIME_TYPES:
             raise HTTPException(
                 status_code=400,
-                detail=f"File content does not match extension. Detected: {detected_mime}"
+                detail=f"MIME type '{detected_mime}' not allowed"
             )
         
-        # Calculate file checksum
-        sha256_hash = hashlib.sha256()
-        sha256_hash.update(file_content)
-        checksum = sha256_hash.hexdigest()
+        # Reset file for StorageManager
+        await file.seek(0)
         
-        # Check for duplicate files
-        existing_doc = db.query(Document).filter_by(checksum=checksum).first()
-        if existing_doc:
-            # Remove the duplicate file
-            file_path.unlink()
-            raise HTTPException(
-                status_code=409,
-                detail=f"This file already exists with ID: {existing_doc.id}"
-            )
-        
-        # Create document record in database
-        doc = Document(
-            document_name=safe_filename,
-            original_name=file.filename,
-            mime_type=detected_mime,
-            file_extension=file_extension,
-            file_size=file.size,
-            checksum=checksum,
-            storage_provider=StorageProviderEnum.LOCAL,
-            storage_path=str(file_path.relative_to(settings.STORAGE_PATH)),
-            status=DocumentStatusEnum.COMPLETED,  # Since we're not processing yet
-            metadata={
-                "upload_timestamp": timestamp,
-                "uploaded_via": "api"
-            }
+        # Step 4: Store document using StorageManager
+        # This handles: conflict resolution, organized paths, checksums, duplicates
+        temp_storage_result = await storage.store_document(
+            file=file,
+            workspace_id=workspace_uuid,
+            document_id=document_id
         )
         
-        db.add(doc)
-        db.commit()
-        db.refresh(doc)
+        # Step 5: Create database record with transaction
+        db.begin()
+        try:
+            doc = Document(
+                id=temp_storage_result.document_id,
+                document_name=Path(temp_storage_result.path).name,
+                original_name=file.filename,
+                mime_type=temp_storage_result.mime_type,
+                file_extension=file_extension,
+                file_size=temp_storage_result.size,
+                checksum=temp_storage_result.checksum,
+                storage_provider=StorageProviderEnum.LOCAL,
+                storage_path=temp_storage_result.path,
+                status=DocumentStatusEnum.COMPLETED,
+                metadata={
+                    "upload_timestamp": datetime.now(timezone.utc).isoformat(),
+                    "uploaded_via": "api",
+                    "workspace_id": str(workspace_uuid),
+                    "conflict_strategy": storage_settings.CONFLICT_STRATEGY.value,
+                    "operation_time_ms": temp_storage_result.operation_time_ms
+                }
+            )
+            
+            db.add(doc)
+            db.commit()
+            
+            logger.info(
+                f"Document uploaded successfully: {doc.id}",
+                extra={
+                    "document_id": str(doc.id),
+                    "filename": file.filename,
+                    "size": temp_storage_result.size,
+                    "storage_path": temp_storage_result.path,
+                    "operation_time_ms": temp_storage_result.operation_time_ms
+                }
+            )
+            
+            # Return enhanced response with storage details
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "success": True,
+                    "message": "File uploaded successfully",
+                    "document": {
+                        "id": str(doc.id),
+                        "filename": doc.original_name,
+                        "storage_filename": doc.document_name,
+                        "size": temp_storage_result.size,
+                        "mime_type": temp_storage_result.mime_type,
+                        "checksum": temp_storage_result.checksum,
+                        "status": doc.status.value,
+                        "created_at": doc.created_at.isoformat()
+                    },
+                    "storage": {
+                        "provider": temp_storage_result.provider.value,
+                        "path": temp_storage_result.path,
+                        "operation_time_ms": temp_storage_result.operation_time_ms
+                    }
+                }
+            )
+            
+        except SQLAlchemyError as db_error:
+            # Rollback database transaction
+            db.rollback()
+            
+            # Clean up storage on database failure
+            if temp_storage_result:
+                try:
+                    await storage.provider.delete_file(temp_storage_result.path)
+                    logger.info(f"Cleaned up storage file after DB error: {temp_storage_result.path}")
+                except Exception as cleanup_error:
+                    logger.error(f"Failed to cleanup storage after DB error: {cleanup_error}")
+            
+            logger.error(f"Database error during upload: {db_error}")
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to save document information"
+            )
+            
+    except StorageQuotaExceeded as quota_error:
+        logger.warning(f"Storage quota exceeded: {quota_error}")
+        raise HTTPException(
+            status_code=413,
+            detail=f"Storage quota exceeded. Used: {quota_error.used_bytes / (1024*1024):.1f}MB, Limit: {quota_error.quota_bytes / (1024*1024):.1f}MB"
+        )
         
-        logger.info(f"Document uploaded successfully: {doc.id} - {safe_filename}")
-        
-        # Return response with document ID
-        return JSONResponse(
-            status_code=200,
-            content={
-                "message": "File uploaded successfully",
-                "document_id": str(doc.id),
-                "filename": safe_filename,
-                "size": file.size,
-                "mime_type": detected_mime,
-                "status": doc.status.value,
-                "created_at": doc.created_at.isoformat()
-            }
+    except StorageException as storage_error:
+        logger.error(f"Storage error: {storage_error}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Storage operation failed: {storage_error.message}"
         )
         
     except HTTPException:
-        # Re-raise HTTP exceptions
+        # Re-raise HTTP exceptions (validation errors)
         raise
+        
     except Exception as e:
-        logger.error(f"Upload failed: {str(e)}")
-        # Try to clean up file if it exists
-        if 'file_path' in locals() and file_path.exists():
-            file_path.unlink()
+        logger.error(f"Unexpected upload error: {str(e)}", exc_info=True)
+        
+        # Emergency cleanup
+        if temp_storage_result:
+            try:
+                await storage.provider.delete_file(temp_storage_result.path)
+            except:
+                pass  # Don't fail the error response due to cleanup issues
+        
         raise HTTPException(
             status_code=500,
-            detail=f"File upload failed: {str(e)}"
+            detail="An unexpected error occurred during upload"
         )
-    finally:
-        # Ensure file is closed
-        await file.close()
 
 
 @router.get("/allowed-types")

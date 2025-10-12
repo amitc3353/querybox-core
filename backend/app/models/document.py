@@ -87,6 +87,13 @@ class Document(Base):
     last_embedding_at = Column(DateTime(timezone=True))
     last_indexed_at = Column(DateTime(timezone=True))
     
+    # Storage access tracking
+    last_accessed_at = Column(DateTime(timezone=True))
+    access_count = Column(Integer, nullable=False, default=0)
+    
+    # Storage optimization
+    storage_size = Column(BigInteger)  # Actual size on disk (may differ from file_size due to compression)
+    
     # Audit trail
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())

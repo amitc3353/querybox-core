@@ -76,11 +76,47 @@ services:
     networks:
       - querybox-network
 
+  # Development storage service (Day 3, Step 5)
+  # Provides persistent local storage for development
+  storage-dev:
+    image: alpine:latest
+    container_name: querybox-storage-dev
+    command: tail -f /dev/null  # Keep container running
+    volumes:
+      # Mount host storage directory for persistence across container restarts
+      - ../storage:/app/storage
+      # Mount temp directory for temporary files
+      - storage_temp:/app/storage/_temp
+      # Mount logs directory for storage operation logs
+      - storage_logs:/app/logs
+    environment:
+      - STORAGE_PATH=/app/storage
+      - TEMP_RETENTION_DAYS=7
+    networks:
+      - querybox-network
+    labels:
+      - "querybox.service=storage"
+      - "querybox.environment=development"
+      - "querybox.description=Local storage persistence for development"
+
 volumes:
   querybox_postgres_data:
   pgadmin_data:
   redis_data:
   minio_data:
+  # Storage volumes for development persistence (Day 3, Step 5)
+  storage_temp:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ../storage/_temp
+  storage_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ../logs/storage
 
 networks:
   querybox-network:
