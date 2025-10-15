@@ -39,10 +39,11 @@ class Settings(BaseSettings):
         ".json", ".xml"
     ]
     
-    # Processing
+    # Processing / Task Queue
     CELERY_BROKER_URL: str = "redis://localhost:6379/1"
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/2"
-    
+    TASK_QUEUE_BACKEND: str = "celery"  # "celery" or "kafka" (future)
+
     class Config:
         env_file = ".env"
         case_sensitive = True

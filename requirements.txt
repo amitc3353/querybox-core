@@ -43,6 +43,10 @@ pgvector==0.2.4
 
 # HTTP client
 httpx==0.25.2
+aiohttp==3.9.1
+
+# Retry logic
+tenacity==8.2.3
 
 # Utilities
 python-multipart==0.0.6
