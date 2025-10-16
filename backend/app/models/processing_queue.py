@@ -1,8 +1,8 @@
 from sqlalchemy import Column, String, Integer, DateTime, ForeignKey, CheckConstraint, Text
-from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.db.database import Base
+from app.models.types import GUID, JSON
 import uuid
 
 
@@ -10,10 +10,10 @@ class ProcessingQueue(Base):
     __tablename__ = "processing_queue"
     
     # Primary identifier
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    
+    id = Column(GUID, primary_key=True, default=uuid.uuid4)
+
     # Reference to document
-    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False)
+    document_id = Column(GUID, ForeignKey("documents.id", ondelete="CASCADE"), nullable=False)
     
     # Queue management
     priority = Column(Integer, default=5, nullable=False)
@@ -36,12 +36,12 @@ class ProcessingQueue(Base):
     
     # Error tracking
     error_message = Column(Text)
-    error_details = Column(JSONB, default={})
+    error_details = Column(JSON, default={})
     error_code = Column(String(50))
-    
+
     # Metadata
-    task_params = Column(JSONB, default={})
-    result_data = Column(JSONB, default={})
+    task_params = Column(JSON, default={})
+    result_data = Column(JSON, default={})
     
     # Timestamps
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())

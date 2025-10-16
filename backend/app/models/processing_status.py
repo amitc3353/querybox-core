@@ -1,9 +1,9 @@
 from sqlalchemy import Column, String, Integer, DateTime, ForeignKey, Enum, Text, CheckConstraint
-from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.db.database import Base
 from app.models.document import ProcessingStageEnum, StageStatusEnum
+from app.models.types import GUID, JSON
 import uuid
 
 
@@ -11,10 +11,10 @@ class ProcessingStatus(Base):
     __tablename__ = "processing_status"
     
     # Primary identifier
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    
+    id = Column(GUID, primary_key=True, default=uuid.uuid4)
+
     # Reference to document being processed
-    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False)
+    document_id = Column(GUID, ForeignKey("documents.id", ondelete="CASCADE"), nullable=False)
     
     # Processing stage information
     stage = Column(
@@ -36,16 +36,16 @@ class ProcessingStatus(Base):
     progress_percentage = Column(Integer, default=0)
     
     # Results and error handling
-    result_data = Column(JSONB, default={})
+    result_data = Column(JSON, default={})
     error_message = Column(Text)
     error_code = Column(String(50))
-    
+
     # Retry tracking
     attempt_number = Column(Integer, nullable=False, default=1)
     max_attempts = Column(Integer, nullable=False, default=3)
-    
+
     # Processing metadata
-    status_metadata = Column(JSONB, default={})
+    status_metadata = Column(JSON, default={})
     
     # Audit
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())

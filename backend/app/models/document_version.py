@@ -1,9 +1,9 @@
 from sqlalchemy import Column, String, Integer, BigInteger, Boolean, DateTime, ForeignKey, Enum, Text
-from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.db.database import Base
 from app.models.document import StorageProviderEnum
+from app.models.types import GUID, JSON
 import uuid
 
 
@@ -11,10 +11,10 @@ class DocumentVersion(Base):
     __tablename__ = "document_versions"
     
     # Primary identifier
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    
+    id = Column(GUID, primary_key=True, default=uuid.uuid4)
+
     # Reference to parent document
-    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False)
+    document_id = Column(GUID, ForeignKey("documents.id", ondelete="CASCADE"), nullable=False)
     
     # Version information
     version_number = Column(Integer, nullable=False)
@@ -37,11 +37,11 @@ class DocumentVersion(Base):
     storage_region = Column(String(50))
     
     # Version-specific metadata
-    version_metadata = Column(JSONB, default={})
+    version_metadata = Column(JSON, default={})
     
     # Version lifecycle
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    created_by_user_id = Column(UUID(as_uuid=True))
+    created_by_user_id = Column(GUID)
     is_latest_version = Column(Boolean, nullable=False, default=False)
     
     # Relationships
