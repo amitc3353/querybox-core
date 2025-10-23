@@ -52,9 +52,6 @@ def override_get_db():
         db.close()
 
 
-app.dependency_overrides[get_db] = override_get_db
-
-
 # ============================================================================
 # PYTEST FIXTURES
 # ============================================================================
@@ -72,8 +69,12 @@ def test_db():
 
 @pytest.fixture(scope="function")
 def client(test_db):
-    """FastAPI test client"""
-    return TestClient(app)
+    """FastAPI test client with proper dependency override"""
+    # Set up dependency override for this test
+    app.dependency_overrides[get_db] = override_get_db
+    yield TestClient(app)
+    # Clean up dependency override after test
+    app.dependency_overrides.clear()
 
 
 @pytest.fixture(scope="function")

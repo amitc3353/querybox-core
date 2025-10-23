@@ -77,13 +77,185 @@ Text extraction, chunking, and preparation for embedding generation
 
 ## ⏳ Day 4: Retrieval & Status [PENDING]
 ### Step 7: Document Query Endpoints (3 hours)
-* [ ] Implement GET document by ID
-* [ ] Create list documents with pagination
-* [ ] Add filtering by status/type
-* [ ] Include metadata in responses
+* [✅] Implement GET document by ID
+* [✅] Create list documents with pagination
+* [✅] Add filtering by status/type
+* [✅] Include metadata in responses
 * **Outcome**: Full document information access
 
-### Step 8: Upload Status Tracking (3 hours)
+### Step 8 (Nov 4-10)
+Goal: Documents Become Searchable
+## Step 8.1
+* [✅] PDF text extraction with pdfplumber
+* [✅] Handle multiple PDF types
+* [✅] Store extracted text in PostgreSQL
+## Step 8.2
+* [] Basic chunking (1000 chars, 200 overlap)
+* [] Sentence boundary preservation
+* [] Store chunks with position tracking
+## Step 8.3
+* [] Simple keyword search endpoint
+* [] Test extraction quality
+* [] Process 10+ sample documents
+Deliverable: Upload PDF → Extract text → Search keywords
+
+### Step 9 (Nov 11-17)
+Goal: Intelligent Chunking + Embeddings
+## Step 9.1
+* [] Proposition-based chunking (3-5 claims per chunk)
+* [] Hierarchical context preservation
+* [] Implement overlap windows
+## Step 9.2
+* [] BGE-M3 embedding generation
+* [] Batch processing (100 chunks at a time)
+* [] Store vectors in pgvector
+## Step 9.3
+* [] Basic vector similarity search
+* [] Combine keyword + vector results
+* [] Test retrieval accuracy
+Deliverable: Semantic search working with >80% recall@10
+
+### Step 10 (Nov 18-24)
+Goal: Hybrid Retrieval + Reranking
+## Step 10.1
+* [] BM25 + Vector fusion (RRF)
+* [] Implement 4-stage retrieval pipeline
+* [] Add metadata filtering
+## Step 10.2
+* [] Cross-encoder reranking (MiniLM-L6)
+* [] MMR for diversity
+* [] Result deduplication
+## Step 10.3
+* [] Citation extraction from chunks
+* [] Source tracking and versioning
+* [] Performance optimization
+Deliverable: /search endpoint with citations, <500ms latency
+
+### Step 11 (Nov 25-Dec 1)
+Goal: Answer Generation with Verification
+## Step 11.1
+* [] LLM integration (GPT-4/Claude)
+* [] Claim generation from passages
+* [] Context window management
+## Step 11.2
+* [] Chain-of-Verification implementation
+* [] Self-questioning phase
+* [] Exact quote matching
+## Step 11.3
+* [] Abstention logic (can't answer = say so)
+* [] Confidence scoring
+* [] Citation formatting [1][2]
+Deliverable: /answer endpoint with verified citations
+
+### Step 12 (Dec 2-8)
+Goal: Speed & Scale Optimization
+## Step 12.1
+* [] Cascade retrieval system
+* [] Semantic cache (SimHash)
+* [] Hot tier indexing
+## Step 12.2
+* [] Query result caching
+* [] Batch processing optimization
+* [] Connection pooling
+## Step 12.3
+* [] Load testing (100 concurrent users)
+* [] Performance profiling
+* [] Database optimization
+Deliverable: P50 <100ms retrieval, handles 100k documents
+
+### Step 13 (Dec 9-15)
+Goal: Accuracy & Quality Assurance
+## Step 13.1
+* [] Golden test set (200 Q&A pairs)
+* [] Groundedness validation
+* [] Hallucination detection
+## Step 13.2
+* [] Adversarial testing
+* [] Conflicting document handling
+* [] Temporal validation
+## Step 13.3
+* [] Accuracy metrics dashboard
+* [] Error analysis and fixes
+* [] Quality report generation
+Deliverable: >95% accuracy, <2% abstention rate
+
+### Step 14 (Dec 16-22)
+Goal: Frontend & User Interface
+## Step 14.1
+* [] Next.js chat interface
+* [] Streaming responses
+* [] Citation hover/click
+## Step 14.2
+* [] Search UI with filters
+* [] Document viewer
+* [] Source highlighting
+## Step 14.3
+* [] Docker packaging
+* [] Environment configuration
+* [] Deployment scripts
+Deliverable: Complete UI + one-click Docker install
+
+### Step 15 (Dec 23-31)
+Goal: Launch & Demo Ready
+## Step 15.1
+* [] Demo site deployment
+* [] Sample datasets (CA policies)
+* [] Performance tuning
+## Step 15.2
+* [] Documentation completion
+* [] API reference
+* [] Video demo recording
+## Step 15.3
+* [] Bug fixes from testing
+* [] Landing page live
+* [] Waitlist/pilot signup
+Deliverable: querybox.io/demo live with pilot-ready system
+
+🎯 Weekly Success Metrics
+Week	Must Complete	Success Metric
+1	Text extraction + search	Can search PDF content
+2	Embeddings + vectors	Semantic search works
+3	Hybrid retrieval	<500ms with citations
+4	Answer generation	Verified answers with sources
+5	Performance optimization	<100ms P50 latency
+6	Quality validation	>95% accuracy proven
+7	User interface	End-to-end demo flow
+8	Launch preparation	Public demo + pilots ready
+⚡ Daily Execution Pattern
+Morning (3-4 hours):
+* Core feature implementation
+* Test as you build
+Afternoon (2-3 hours):
+* Integration and debugging
+* Performance optimization
+Evening (1 hour):
+* Documentation
+* Plan next day
+
+🚨 Critical Checkpoints
+Week 2 End: If embeddings not working → Use simpler model Week 4 End: If accuracy <90% → Raise abstention thresholdWeek 6 End: If speed >200ms → Add more caching Week 7 End: If UI not ready → Focus on API-only launch
+
+💡 This Week's Immediate Focus
+Since you're starting Week 1 now:
+Today (Monday):
+1. Install pdfplumber
+2. Extract text from one PDF
+3. Save to database
+Tomorrow (Tuesday):
+1. Process 10 PDFs
+2. Handle edge cases
+3. Add metadata extraction
+Wednesday:
+1. Implement chunking
+2. Test chunk quality
+3. Store in chunks table
+By Friday:
+* Search endpoint working
+* Can find content in uploaded PDFs
+* Ready for embeddings next week
+
+
+<!-- ### Step 8: Upload Status Tracking (3 hours)
 * [ ] Create status update mechanism
 * [ ] Implement progress tracking
 * [ ] Add Redis-based status cache
@@ -352,4 +524,4 @@ Week 3 Deliverable
 Processing Engine: Complete PDF processing with text extraction, chunking, and storage
 Week 4 Deliverable
 Production-Ready System: Optimized, scalable, monitored, and documented upload & processing pipeline
-This focused plan concentrates specifically on the document upload and processing features, providing clear steps with defined outcomes that build progressively toward a production-ready system.
+This focused plan concentrates specifically on the document upload and processing features, providing clear steps with defined outcomes that build progressively toward a production-ready system. -->

@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(python -m pytest:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Read(//Users/amitchandel/Documents/workspace/build5M/querybox-core/**)",
+      "Bash(tree:*)"
     ],
     "deny": [],
     "ask": []

@@ -106,6 +106,7 @@ class Document(Base):
     
     # Relationships
     versions = relationship("DocumentVersion", back_populates="document", cascade="all, delete-orphan")
+    document_text = relationship("DocumentText", back_populates="document", uselist=False, cascade="all, delete-orphan")
     processing_status = relationship("ProcessingStatus", back_populates="document", cascade="all, delete-orphan")
     embeddings = relationship("Embedding", back_populates="document", cascade="all, delete-orphan")
     queue_items = relationship("ProcessingQueue", back_populates="document", cascade="all, delete-orphan")

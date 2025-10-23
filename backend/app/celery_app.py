@@ -63,6 +63,10 @@ celery_app.conf.task_routes = {
         "queue": "metadata",
         "routing_key": "metadata"
     },
+    "app.tasks.extraction_tasks.*": {
+        "queue": "extraction",
+        "routing_key": "extraction"
+    },
     # Future: Add more queues for embeddings, chunking, etc.
     # "app.tasks.embedding_tasks.*": {"queue": "embeddings"},
     # "app.tasks.chunking_tasks.*": {"queue": "chunking"},

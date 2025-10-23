@@ -20,6 +20,7 @@ from app.models.document import Document, DocumentStatusEnum, StorageProviderEnu
 from app.services.storage import StorageManager
 from app.services.storage.exceptions import StorageException, StorageQuotaExceeded
 from app.schemas.storage import StorageResult
+from app.tasks.extraction_tasks import extract_document_text
 
 logger = logging.getLogger(__name__)
 
@@ -132,7 +133,7 @@ async def upload_document(
             
             db.add(doc)
             db.commit()
-            
+
             logger.info(
                 f"Document uploaded successfully: {doc.id}",
                 extra={
@@ -143,7 +144,17 @@ async def upload_document(
                     "operation_time_ms": temp_storage_result.operation_time_ms
                 }
             )
-            
+
+            # Trigger text extraction for supported formats
+            if detected_mime in ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]:
+                try:
+                    # Queue async text extraction task
+                    task = extract_document_text.delay(str(doc.id))
+                    logger.info(f"Queued text extraction task {task.id} for document {doc.id}")
+                except Exception as task_error:
+                    # Don't fail upload if task queueing fails
+                    logger.error(f"Failed to queue extraction task: {task_error}")
+
             # Return enhanced response with storage details
             return JSONResponse(
                 status_code=200,
