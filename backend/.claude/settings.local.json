@@ -4,7 +4,10 @@
       "Bash(python -m pytest:*)",
       "Bash(python:*)",
       "Read(//Users/amitchandel/Documents/workspace/build5M/querybox-core/**)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Read(//Users/amitchandel/Documents/workspace/build5M/**)",
+      "Bash(python3:*)",
+      "Bash(chmod:*)"
     ],
     "deny": [],
     "ask": []

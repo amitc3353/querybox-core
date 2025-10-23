@@ -11,6 +11,7 @@ from app.db.database import SessionLocal
 from app.models.document import Document, ProcessingStageEnum, StageStatusEnum, DocumentStatusEnum
 from app.services.extraction import get_text_extractor
 from app.services.processing.status_tracker import ProcessingStatusTracker
+from app.tasks.chunking_tasks import chunk_document_text
 
 
 logger = logging.getLogger(__name__)
@@ -162,6 +163,10 @@ def extract_document_text(self, document_id: str):
             f"{result.text_length} chars, {result.pages_with_ocr}/{result.total_pages} OCR pages, "
             f"quality={result.extraction_quality:.2f}"
         )
+
+        # Queue chunking task
+        chunk_document_text.delay(document_id)
+        logger.info(f"Queued chunking task for document {document_id}")
 
         return {
             "success": True,

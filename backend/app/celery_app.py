@@ -67,9 +67,12 @@ celery_app.conf.task_routes = {
         "queue": "extraction",
         "routing_key": "extraction"
     },
-    # Future: Add more queues for embeddings, chunking, etc.
+    "app.tasks.chunking_tasks.*": {
+        "queue": "chunking",
+        "routing_key": "chunking"
+    },
+    # Future: Add more queues for embeddings, etc.
     # "app.tasks.embedding_tasks.*": {"queue": "embeddings"},
-    # "app.tasks.chunking_tasks.*": {"queue": "chunking"},
 }
 
 # Auto-discover tasks in app.tasks package
