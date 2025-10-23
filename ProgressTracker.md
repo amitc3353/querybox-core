@@ -90,9 +90,9 @@ Goal: Documents Become Searchable
 * [✅] Handle multiple PDF types
 * [✅] Store extracted text in PostgreSQL
 ## Step 8.2
-* [] Basic chunking (1000 chars, 200 overlap)
-* [] Sentence boundary preservation
-* [] Store chunks with position tracking
+* [✅] Basic chunking (1000 chars, 200 overlap)
+* [✅] Sentence boundary preservation
+* [✅] Store chunks with position tracking
 ## Step 8.3
 * [] Simple keyword search endpoint
 * [] Test extraction quality
