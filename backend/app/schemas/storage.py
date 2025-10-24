@@ -8,7 +8,7 @@ Defines data models for storage operations, results, and configuration.
 from enum import Enum
 from typing import Optional, Dict, Any, List
 from datetime import datetime
-from uuid import UUID
+from uuid import UUID, uuid4
 from pydantic import BaseModel, Field
 
 
@@ -152,7 +152,7 @@ class StorageConfig(BaseModel):
 class StorageOperation(BaseModel):
     """Record of a storage operation for audit trail"""
     
-    operation_id: UUID = Field(default_factory=UUID, description="Unique operation ID")
+    operation_id: UUID = Field(default_factory=uuid4, description="Unique operation ID")
     operation_type: str = Field(..., description="Type of operation (save, retrieve, delete)")
     
     # Target

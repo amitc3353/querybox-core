@@ -108,9 +108,54 @@ async def upload_document(
             document_id=document_id
         )
         
-        # Step 5: Create database record with transaction
-        db.begin()
+        # Step 5: Create database record with deduplication
+        # Note: Transaction is already started by FastAPI's Depends(get_db)
         try:
+            # Check if document with same checksum already exists (deduplication)
+            existing_doc = db.query(Document).filter(
+                Document.checksum == temp_storage_result.checksum,
+                Document.is_deleted == False
+            ).first()
+
+            if existing_doc:
+                # Document already exists - clean up the newly uploaded file
+                try:
+                    await storage.provider.delete_file(temp_storage_result.path)
+                    logger.info(f"Duplicate detected, cleaned up new upload: {temp_storage_result.path}")
+                except Exception as cleanup_error:
+                    logger.warning(f"Failed to cleanup duplicate file: {cleanup_error}")
+
+                # Return existing document
+                logger.info(
+                    f"Duplicate document detected by checksum: {existing_doc.id}",
+                    extra={
+                        "document_id": str(existing_doc.id),
+                        "original_filename": file.filename,
+                        "existing_filename": existing_doc.original_name,
+                        "checksum": temp_storage_result.checksum
+                    }
+                )
+
+                return JSONResponse(
+                    status_code=200,
+                    content={
+                        "success": True,
+                        "message": "File already exists (duplicate detected by content hash)",
+                        "duplicate": True,
+                        "document": {
+                            "id": str(existing_doc.id),
+                            "filename": existing_doc.original_name,
+                            "storage_filename": existing_doc.document_name,
+                            "size": existing_doc.file_size,
+                            "mime_type": existing_doc.mime_type,
+                            "checksum": existing_doc.checksum,
+                            "status": existing_doc.status.value,
+                            "created_at": existing_doc.created_at.isoformat()
+                        }
+                    }
+                )
+
+            # No duplicate found - create new document
             doc = Document(
                 id=temp_storage_result.document_id,
                 document_name=Path(temp_storage_result.path).name,
@@ -122,7 +167,7 @@ async def upload_document(
                 storage_provider=StorageProviderEnum.LOCAL,
                 storage_path=temp_storage_result.path,
                 status=DocumentStatusEnum.COMPLETED,
-                metadata={
+                document_metadata={
                     "upload_timestamp": datetime.now(timezone.utc).isoformat(),
                     "uploaded_via": "api",
                     "workspace_id": str(workspace_uuid),
@@ -130,7 +175,7 @@ async def upload_document(
                     "operation_time_ms": temp_storage_result.operation_time_ms
                 }
             )
-            
+
             db.add(doc)
             db.commit()
 
@@ -138,7 +183,7 @@ async def upload_document(
                 f"Document uploaded successfully: {doc.id}",
                 extra={
                     "document_id": str(doc.id),
-                    "filename": file.filename,
+                    "original_filename": file.filename,
                     "size": temp_storage_result.size,
                     "storage_path": temp_storage_result.path,
                     "operation_time_ms": temp_storage_result.operation_time_ms

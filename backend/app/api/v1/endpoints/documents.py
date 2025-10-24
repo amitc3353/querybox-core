@@ -1,16 +1,18 @@
 """
 Document Query Endpoints
 Step 7: Document Query and Retrieval API
+Step 8.3: Search Quality Validation
 
 Endpoints:
-- GET  /documents                   - List documents with pagination/filtering
-- GET  /documents/search            - Search documents
-- GET  /documents/stats             - Document statistics
-- GET  /documents/{document_id}     - Get single document by ID
-- DELETE /documents/{document_id}   - Soft delete document
+- GET  /documents                            - List documents with pagination/filtering
+- GET  /documents/search                     - Search documents
+- GET  /documents/stats                      - Document statistics
+- GET  /documents/{document_id}/search-quality  - Validate search readiness (Step 8.3)
+- GET  /documents/{document_id}              - Get single document by ID
+- DELETE /documents/{document_id}            - Soft delete document
 
 IMPORTANT: Endpoint order matters in FastAPI!
-Specific paths (/search, /stats) MUST come before generic paths (/{document_id})
+Specific paths (/search, /stats, /{id}/search-quality) MUST come before generic paths (/{document_id})
 """
 from fastapi import APIRouter, Depends, Query, Path, HTTPException, status
 from sqlalchemy.orm import Session
@@ -184,7 +186,114 @@ async def get_document_stats(
     return stats
 
 
-# 4. Get document by ID (/{document_id}) - generic path, must come after specific paths
+# 4. Get document search quality (/{document_id}/search-quality) - specific path with parameter
+@router.get(
+    "/{document_id}/search-quality",
+    status_code=status.HTTP_200_OK,
+    summary="Validate document search quality",
+    description="Check if document is ready for search with extraction and chunking quality metrics"
+)
+async def get_document_search_quality(
+    document_id: str = Path(..., description="Document UUID", example="550e8400-e29b-41d4-a716-446655440000"),
+    db: Session = Depends(get_db)
+):
+    """
+    Validate document search readiness for Step 8.3
+
+    **Validates:**
+    - Text extraction quality (Step 8.1)
+    - Chunking quality (Step 8.2)
+    - Overall search readiness
+
+    **Checks:**
+    - Extraction: text length, quality score, OCR usage
+    - Chunking: chunk count, sizes, overlap, index gaps
+    - Readiness: combined quality score
+
+    **Example Response:**
+    ```json
+    {
+      "document_id": "550e8400-...",
+      "document_name": "sample.pdf",
+      "is_search_ready": true,
+      "extraction_passed": true,
+      "chunking_passed": true,
+      "overall_quality_score": 0.88,
+      "extraction_details": {
+        "text_length": 45230,
+        "extraction_quality": 0.92,
+        "extraction_method": "docling",
+        "pages_with_ocr": 2,
+        "total_pages": 10
+      },
+      "chunking_details": {
+        "chunk_count": 47,
+        "avg_chunk_size": 982,
+        "chunks_in_range": 46,
+        "has_proper_overlap": true
+      },
+      "issues": [],
+      "recommendations": ["Quality is good for search"]
+    }
+    ```
+
+    Args:
+        document_id: Document UUID to validate
+        db: Database session (injected)
+
+    Returns:
+        Search readiness report with quality metrics
+
+    Raises:
+        HTTPException 400: Invalid UUID format
+        HTTPException 404: Document not found
+        HTTPException 500: Validation error
+    """
+    logger.info(f"GET /documents/{document_id}/search-quality")
+
+    # Validate UUID format
+    try:
+        doc_uuid = UUID(document_id)
+    except ValueError:
+        logger.warning(f"Invalid UUID format: {document_id}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid document ID format"
+        )
+
+    # Get quality validator
+    from app.services.search import get_quality_validator
+    validator = get_quality_validator(db)
+
+    try:
+        # Validate search readiness
+        result = validator.validate_search_readiness(doc_uuid)
+
+        # Check if document exists
+        if result["document_name"] is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Document not found: {document_id}"
+            )
+
+        logger.info(
+            f"Document {document_id} quality check: "
+            f"ready={result['is_search_ready']}, quality={result['overall_quality_score']}"
+        )
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error validating document quality: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to validate document quality: {str(e)}"
+        )
+
+
+# 5. Get document by ID (/{document_id}) - generic path, must come after specific paths
 @router.get(
     "/{document_id}",
     response_model=DocumentResponse,

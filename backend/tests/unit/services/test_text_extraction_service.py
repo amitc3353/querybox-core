@@ -155,13 +155,14 @@ class TestDocumentTextExtractor:
         """Test extraction fails when converter is None"""
         extractor.converter = None
 
-        # Mock initialization to also fail
-        with patch.object(extractor, '_initialize_converter'):
-            result = await extractor.extract_text(
-                file_path="/tmp/test.pdf",
-                document_id=uuid4(),
-                mime_type="application/pdf",
-            )
+        # Mock file exists check and initialization to fail
+        with patch('pathlib.Path.exists', return_value=True):
+            with patch.object(extractor, '_initialize_converter'):
+                result = await extractor.extract_text(
+                    file_path="/tmp/test.docx",
+                    document_id=uuid4(),
+                    mime_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                )
 
         assert result.success is False
         assert "not available" in result.error_message.lower()

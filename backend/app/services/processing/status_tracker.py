@@ -97,17 +97,18 @@ class ProcessingStatusTracker:
                 old_status = existing_status.status
                 existing_status.status = status
                 existing_status.updated_at = current_time
-                
-                # Calculate duration if completing
+
+                # Set completed_at and duration_ms for terminal states (must set both or neither per constraint)
                 if status in [StageStatusEnum.COMPLETED, StageStatusEnum.FAILED]:
+                    existing_status.completed_at = current_time
                     if existing_status.started_at:
                         duration = (current_time - existing_status.started_at).total_seconds() * 1000
                         existing_status.duration_ms = int(duration)
-                
+
                 # Handle error information
                 if status == StageStatusEnum.FAILED:
                     existing_status.error_message = error_message
-                    existing_status.retry_count = (existing_status.retry_count or 0) + 1
+                    existing_status.attempt_number = (existing_status.attempt_number or 0) + 1
                 elif status == StageStatusEnum.COMPLETED:
                     existing_status.error_message = None  # Clear previous errors
                 
@@ -122,14 +123,17 @@ class ProcessingStatusTracker:
                 
             else:
                 # Create new record
+                # Note: For terminal states, must set BOTH completed_at and duration_ms (or neither) per DB constraint
+                is_terminal = status in [StageStatusEnum.COMPLETED, StageStatusEnum.FAILED, StageStatusEnum.SKIPPED]
                 record = ProcessingStatus(
                     document_id=document_id,
                     stage=stage,
                     status=status,
                     started_at=current_time if status == StageStatusEnum.IN_PROGRESS else None,
-                    completed_at=current_time if status in [StageStatusEnum.COMPLETED, StageStatusEnum.FAILED, StageStatusEnum.SKIPPED] else None,
+                    completed_at=current_time if is_terminal else None,
+                    duration_ms=0 if is_terminal else None,  # Set to 0 for immediate terminal states
                     error_message=error_message if status == StageStatusEnum.FAILED else None,
-                    retry_count=1 if status == StageStatusEnum.FAILED else 0,
+                    attempt_number=1 if status == StageStatusEnum.FAILED else 1,
                     status_metadata=processing_metadata.dict() if processing_metadata else {},
                     created_at=current_time,
                     updated_at=current_time
@@ -282,10 +286,10 @@ class ProcessingStatusTracker:
                     "completed_at": status.completed_at.isoformat() if status.completed_at else None,
                     "duration_ms": status.duration_ms,
                     "error_message": status.error_message,
-                    "retry_count": status.retry_count,
+                    "attempt_number": status.attempt_number,
                     "metadata": status.status_metadata or {}
                 }
-                
+
                 stages[status.stage.value] = stage_info
                 
                 # Get estimated completion from active stage

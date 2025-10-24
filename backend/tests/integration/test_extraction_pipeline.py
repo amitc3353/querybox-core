@@ -7,6 +7,7 @@ from unittest.mock import Mock, patch, AsyncMock
 from uuid import uuid4
 from pathlib import Path
 import tempfile
+from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -166,7 +167,7 @@ class TestExtractionServiceIntegration:
 
     @requires_docling
     @pytest.mark.asyncio
-    async def test_extract_and_save_to_database(self):
+    async def test_extract_and_save_to_database(self, test_db):
         """Test extraction saves to database correctly"""
         from app.services.extraction import get_text_extractor
         from app.services.extraction.text_extraction_service import TextExtractionResult
@@ -183,7 +184,7 @@ class TestExtractionServiceIntegration:
                 mime_type="application/pdf",
                 file_extension=".pdf",
                 file_size=1024,
-                checksum="abc123",
+                checksum=f"checksum-{uuid4()}",  # Unique checksum for each test
                 storage_path="/tmp/test.pdf",
                 storage_provider="local",
                 status=DocumentStatusEnum.PENDING,
@@ -262,7 +263,7 @@ class TestExtractionServiceIntegration:
                 text_length=8,
                 extraction_method="fallback",
                 extraction_engine="basic",
-                extracted_at=document.created_at,
+                extracted_at=datetime.now(timezone.utc),
             )
             db.add(initial_text)
             db.commit()
@@ -340,7 +341,7 @@ class TestDatabaseConstraints:
                 text_length=10,
                 extraction_method="docling",
                 extraction_engine="native",
-                extracted_at=document.created_at,
+                extracted_at=datetime.now(timezone.utc),
             )
             db.add(text1)
             db.commit()
@@ -352,7 +353,7 @@ class TestDatabaseConstraints:
                 text_length=11,
                 extraction_method="docling",
                 extraction_engine="native",
-                extracted_at=document.created_at,
+                extracted_at=datetime.now(timezone.utc),
             )
             db.add(text2)
 
@@ -391,7 +392,7 @@ class TestDatabaseConstraints:
                 text_length=18,
                 extraction_method="docling",
                 extraction_engine="native",
-                extracted_at=document.created_at,
+                extracted_at=datetime.now(timezone.utc),
             )
             db.add(text)
             db.commit()

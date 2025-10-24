@@ -125,9 +125,10 @@ async def health():
         stat = os.statvfs(storage_path) if storage_exists else None
         if stat:
             total_bytes = stat.f_blocks * stat.f_frsize
-            available_bytes = stat.f_available * stat.f_frsize
+            # Use f_bavail for cross-platform compatibility (macOS uses f_bavail, Linux has both)
+            available_bytes = stat.f_bavail * stat.f_frsize
             used_bytes = total_bytes - available_bytes
-            usage_percentage = (used_bytes / total_bytes) * 100
+            usage_percentage = (used_bytes / total_bytes) * 100 if total_bytes > 0 else 0
             
             health_status["checks"]["storage"] = {
                 "status": "healthy",

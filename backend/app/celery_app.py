@@ -6,6 +6,23 @@ This file is ONLY imported by celery_backend.py - application code should
 use the task queue abstraction instead.
 """
 
+# ============================================================================
+# CRITICAL: Apple Silicon (M1/M2/M3) MPS Workaround
+# ============================================================================
+# Docling/PyTorch's MPS (Metal Performance Shaders) crashes in multiprocessing
+# due to Apple Metal not supporting forked processes. This is a development
+# environment issue only - production Linux servers don't have MPS.
+#
+# Setting these environment variables BEFORE imports ensures PyTorch/Docling
+# use CPU mode instead of MPS, preventing SIGABRT crashes.
+#
+# Performance impact: NONE in production (MPS doesn't exist on Linux)
+# ============================================================================
+import os
+os.environ['PYTORCH_ENABLE_MPS'] = '0'
+os.environ['PYTORCH_MPS_HIGH_WATERMARK_RATIO'] = '0.0'
+os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
+
 from celery import Celery
 from app.core.config import settings
 
@@ -18,6 +35,9 @@ celery_app = Celery(
 
 # Configure Celery
 celery_app.conf.update(
+    # Broker connection
+    broker_connection_retry_on_startup=True,
+
     # Serialization
     task_serializer='json',
     accept_content=['json'],
@@ -89,10 +109,26 @@ celery_app.conf.beat_schedule = {
 
 
 # Signal handlers for monitoring (optional)
-from celery.signals import task_prerun, task_postrun, task_failure
+from celery.signals import task_prerun, task_postrun, task_failure, worker_process_init
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+@worker_process_init.connect
+def configure_worker_process(**kwargs):
+    """
+    Configure each worker process when it initializes (after fork).
+
+    This is CRITICAL for Apple Silicon - we must disable MPS in EACH worker
+    process because environment variables set in the main process don't
+    carry over to forked children.
+    """
+    import os
+    os.environ['PYTORCH_ENABLE_MPS'] = '0'
+    os.environ['PYTORCH_MPS_HIGH_WATERMARK_RATIO'] = '0.0'
+    os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
+    logger.info("Worker process initialized with MPS disabled (Apple Silicon fix)")
 
 
 @task_prerun.connect

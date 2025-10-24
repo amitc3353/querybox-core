@@ -94,9 +94,9 @@ Goal: Documents Become Searchable
 * [✅] Sentence boundary preservation
 * [✅] Store chunks with position tracking
 ## Step 8.3
-* [] Simple keyword search endpoint
-* [] Test extraction quality
-* [] Process 10+ sample documents
+* [✅] Simple keyword search endpoint
+* [✅] Test extraction quality
+* [✅] Process 10+ sample documents
 Deliverable: Upload PDF → Extract text → Search keywords
 
 ### Step 9 (Nov 11-17)

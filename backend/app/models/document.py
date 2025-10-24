@@ -58,7 +58,7 @@ class Document(Base):
     
     # Storage configuration
     storage_provider = Column(
-        Enum(StorageProviderEnum, name="storage_provider_enum"),
+        Enum(StorageProviderEnum, name="storage_provider_enum", values_callable=lambda x: [e.value for e in x]),
         nullable=False,
         default=StorageProviderEnum.LOCAL
     )
@@ -68,7 +68,7 @@ class Document(Base):
     
     # Document status
     status = Column(
-        Enum(DocumentStatusEnum, name="document_status_enum"),
+        Enum(DocumentStatusEnum, name="document_status_enum", values_callable=lambda x: [e.value for e in x]),
         nullable=False,
         default=DocumentStatusEnum.PENDING
     )

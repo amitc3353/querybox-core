@@ -46,8 +46,9 @@ def test_connection():
     Used in health checks
     """
     try:
+        from sqlalchemy import text
         with engine.connect() as conn:
-            conn.execute("SELECT 1")
+            conn.execute(text("SELECT 1"))
         return True
     except Exception as e:
         logger.error(f"Database connection failed: {str(e)}")

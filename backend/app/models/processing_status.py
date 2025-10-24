@@ -18,11 +18,11 @@ class ProcessingStatus(Base):
     
     # Processing stage information
     stage = Column(
-        Enum(ProcessingStageEnum, name="processing_stage_enum"),
+        Enum(ProcessingStageEnum, name="processing_stage_enum", values_callable=lambda x: [e.value for e in x]),
         nullable=False
     )
     status = Column(
-        Enum(StageStatusEnum, name="stage_status_enum"),
+        Enum(StageStatusEnum, name="stage_status_enum", values_callable=lambda x: [e.value for e in x]),
         nullable=False,
         default=StageStatusEnum.NOT_STARTED
     )
@@ -44,8 +44,8 @@ class ProcessingStatus(Base):
     attempt_number = Column(Integer, nullable=False, default=1)
     max_attempts = Column(Integer, nullable=False, default=3)
 
-    # Processing metadata
-    status_metadata = Column(JSON, default={})
+    # Processing metadata (Python attribute is 'status_metadata', DB column is 'metadata')
+    status_metadata = Column('metadata', JSON, default={})
     
     # Audit
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())

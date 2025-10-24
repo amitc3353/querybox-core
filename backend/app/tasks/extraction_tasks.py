@@ -2,9 +2,17 @@
 Text Extraction Celery Tasks
 Async tasks for document text extraction using Docling
 """
+# CRITICAL: Disable MPS before ANY imports that might load PyTorch
+# This must be at the very top before any other imports
+import os
+os.environ['PYTORCH_ENABLE_MPS'] = '0'
+os.environ['PYTORCH_MPS_HIGH_WATERMARK_RATIO'] = '0.0'
+os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
+
 import logging
 import asyncio
 from uuid import UUID
+import psutil
 
 from app.celery_app import celery_app
 from app.db.database import SessionLocal
@@ -54,6 +62,10 @@ def extract_document_text(self, document_id: str):
     db = SessionLocal()
     doc_uuid = UUID(document_id)
 
+    # Track memory usage
+    process = psutil.Process()
+    memory_start_mb = process.memory_info().rss / 1024 / 1024
+
     try:
         # Get document from database
         document = db.query(Document).filter(Document.id == doc_uuid).first()
@@ -64,7 +76,7 @@ def extract_document_text(self, document_id: str):
 
         logger.info(
             f"Starting text extraction task for document {document_id} "
-            f"({document.original_name})"
+            f"({document.original_name}) - Memory: {memory_start_mb:.1f}MB"
         )
 
         # Initialize status tracker
@@ -84,9 +96,14 @@ def extract_document_text(self, document_id: str):
         # Get text extractor
         extractor = get_text_extractor()
 
+        # Build absolute file path from storage_path
+        from app.core.config import settings
+        from pathlib import Path
+        absolute_file_path = str(Path(settings.STORAGE_PATH) / document.storage_path)
+
         # Extract text (async operation wrapped)
         result = run_async(extractor.extract_text(
-            file_path=document.storage_path,
+            file_path=absolute_file_path,
             document_id=doc_uuid,
             mime_type=document.mime_type,
         ))
@@ -158,10 +175,16 @@ def extract_document_text(self, document_id: str):
         document.status = DocumentStatusEnum.COMPLETED
         db.commit()
 
+        # Calculate memory usage
+        memory_end_mb = process.memory_info().rss / 1024 / 1024
+        memory_delta_mb = memory_end_mb - memory_start_mb
+
         logger.info(
             f"Text extraction completed for document {document_id}: "
             f"{result.text_length} chars, {result.pages_with_ocr}/{result.total_pages} OCR pages, "
-            f"quality={result.extraction_quality:.2f}"
+            f"quality={result.extraction_quality:.2f}, "
+            f"duration={result.extraction_duration_ms}ms, "
+            f"memory={memory_end_mb:.1f}MB (Δ{memory_delta_mb:+.1f}MB)"
         )
 
         # Queue chunking task
@@ -177,6 +200,8 @@ def extract_document_text(self, document_id: str):
             "total_pages": result.total_pages,
             "extraction_quality": result.extraction_quality,
             "extraction_duration_ms": result.extraction_duration_ms,
+            "memory_used_mb": round(memory_end_mb, 1),
+            "memory_delta_mb": round(memory_delta_mb, 1),
         }
 
     except Exception as e:
