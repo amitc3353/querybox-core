@@ -101,19 +101,40 @@ Deliverable: Upload PDF → Extract text → Search keywords
 
 ### Step 9 (Nov 11-17)
 Goal: Intelligent Chunking + Embeddings
-## Step 9.1
-* [] Proposition-based chunking (3-5 claims per chunk)
-* [] Hierarchical context preservation
-* [] Implement overlap windows
-## Step 9.2
-* [] BGE-M3 embedding generation
-* [] Batch processing (100 chunks at a time)
-* [] Store vectors in pgvector
-## Step 9.3
-* [] Basic vector similarity search
-* [] Combine keyword + vector results
-* [] Test retrieval accuracy
-Deliverable: Semantic search working with >80% recall@10
+## Step 9.0 pgvector Setup 
+
+  [ ] Install pgvector extension in PostgreSQL
+  [ ] Create migration to add vector column to embeddings table
+  [ ] Add Vector column type to SQLAlchemy model
+  [ ] Create vector similarity index (HNSW or IVFFlat)
+  Deliverable: Database ready for embeddings
+
+ ## Step 9.1: Chunking Improvements (2-3 days)
+
+  [ ] Enhance sentence boundary detection (spaCy/NLTK)
+  [ ] Preserve paragraph/section structure
+  [ ] Add rich metadata (headings, tables, page numbers)
+  [ ] Optimize chunk size for BGE-M3 (512 tokens recommended)
+  [ ] Test chunk quality on 10+ documents
+  Deliverable: High-quality chunks ready for embedding
+
+ ## Step 9.2: BGE-M3 Embedding Generation (2-3 days)
+
+  [ ] Install BGE-M3 model (sentence-transformers)
+  [ ] Implement embedding generation service
+  [ ] Add batch processing (100 chunks at a time)
+  [ ] Store embeddings in pgvector with proper indexing
+  [ ] Add Celery task for async embedding generation
+  Deliverable: Documents embedded and stored
+
+ ## Step 9.3: Vector Similarity Search (2-3 days)
+
+  [ ] Implement vector-only search endpoint
+  [ ] Use cosine similarity with pgvector
+  [ ] Return top-k results with similarity scores
+  [ ] Test retrieval accuracy (measure recall@10)
+  [ ] Benchmark search latency (<200ms target)
+  Deliverable: Working semantic search (vector-only, >80% recall)
 
 ### Step 10 (Nov 18-24)
 Goal: Hybrid Retrieval + Reranking
@@ -137,6 +158,8 @@ Goal: Answer Generation with Verification
 * [] LLM integration (GPT-4/Claude)
 * [] Claim generation from passages
 * [] Context window management
+* [] Proposition-based chunking (3-5 claims per chunk)
+
 ## Step 11.2
 * [] Chain-of-Verification implementation
 * [] Self-questioning phase

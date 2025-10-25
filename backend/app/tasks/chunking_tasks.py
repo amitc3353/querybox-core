@@ -21,6 +21,83 @@ from app.services.processing.status_tracker import ProcessingStatusTracker
 logger = logging.getLogger(__name__)
 
 
+def validate_chunk_quality(document_id: UUID, db) -> float:
+    """
+    Validate chunk quality based on business rules (section 4.2)
+
+    Quality scoring (additive, max 1.0):
+    - Avg chunk size 400-600 tokens: +0.3
+    - >80% chunks have headings: +0.3
+    - Semantic density 0.5-0.8: +0.2
+    - No chunks < 100 tokens: +0.2
+
+    Args:
+        document_id: Document UUID
+        db: Database session
+
+    Returns:
+        Quality score from 0.0 to 1.0
+    """
+    from app.models.embedding import Embedding
+
+    # Query all chunks for this document
+    chunks = db.query(Embedding).filter(
+        Embedding.document_id == document_id
+    ).all()
+
+    if not chunks:
+        return 0.0
+
+    quality_score = 0.0
+
+    # 1. Avg chunk size 400-600 tokens: +0.3
+    total_tokens = sum(c.chunk_tokens for c in chunks if c.chunk_tokens)
+    avg_tokens = total_tokens / len(chunks) if chunks else 0
+    if 400 <= avg_tokens <= 600:
+        quality_score += 0.3
+        logger.debug(f"Quality check passed: avg_tokens={avg_tokens:.0f} (400-600) +0.3")
+    else:
+        logger.debug(f"Quality check failed: avg_tokens={avg_tokens:.0f} (expected 400-600)")
+
+    # 2. >80% chunks have headings: +0.3
+    chunks_with_headings = sum(
+        1 for c in chunks
+        if c.section_heading is not None and c.section_heading.strip()
+    )
+    heading_coverage = chunks_with_headings / len(chunks) if chunks else 0
+    if heading_coverage > 0.8:
+        quality_score += 0.3
+        logger.debug(f"Quality check passed: heading_coverage={heading_coverage:.1%} (>80%) +0.3")
+    else:
+        logger.debug(f"Quality check failed: heading_coverage={heading_coverage:.1%} (expected >80%)")
+
+    # 3. Semantic density 0.5-0.8: +0.2
+    densities = [c.semantic_density for c in chunks if c.semantic_density is not None]
+    avg_density = sum(densities) / len(densities) if densities else 0
+    if 0.5 <= avg_density <= 0.8:
+        quality_score += 0.2
+        logger.debug(f"Quality check passed: avg_density={avg_density:.2f} (0.5-0.8) +0.2")
+    else:
+        logger.debug(f"Quality check failed: avg_density={avg_density:.2f} (expected 0.5-0.8)")
+
+    # 4. No chunks < 100 tokens: +0.2
+    small_chunks = [c for c in chunks if c.chunk_tokens and c.chunk_tokens < 100]
+    if not small_chunks:
+        quality_score += 0.2
+        logger.debug(f"Quality check passed: no chunks < 100 tokens +0.2")
+    else:
+        logger.debug(f"Quality check failed: {len(small_chunks)} chunks < 100 tokens")
+
+    logger.info(
+        f"Chunk quality validation for document {document_id}: "
+        f"score={quality_score:.2f}, avg_tokens={avg_tokens:.0f}, "
+        f"heading_coverage={heading_coverage:.1%}, avg_density={avg_density:.2f}, "
+        f"small_chunks={len(small_chunks)}"
+    )
+
+    return round(quality_score, 2)
+
+
 def run_async(coro):
     """Helper to run async coroutines in sync Celery tasks"""
     try:
@@ -155,7 +232,16 @@ def chunk_document_text(self, document_id: str):
                 "document_id": document_id,
             }
 
-        # Chunking successful - mark stage as COMPLETED
+        # Chunking successful - validate quality using business rules
+        quality_score = validate_chunk_quality(doc_uuid, db)
+
+        if quality_score < 0.6:
+            logger.warning(
+                f"Low chunk quality for document {document_id} ({document.original_name}): "
+                f"quality_score={quality_score:.2f}, threshold=0.6 (MIN_QUALITY_SCORE)"
+            )
+
+        # Mark stage as COMPLETED
         # Note: ProcessingStatusTracker.mark_stage_completed doesn't support result_data parameter
         # We'll store it in the processing_status table via direct update
         run_async(tracker.mark_stage_completed(
@@ -163,7 +249,7 @@ def chunk_document_text(self, document_id: str):
             stage=ProcessingStageEnum.CHUNKING,
         ))
 
-        # Update result_data separately
+        # Update result_data with quality_score
         status_record = db.query(ProcessingStatus).filter(
             ProcessingStatus.document_id == doc_uuid,
             ProcessingStatus.stage == ProcessingStageEnum.CHUNKING
@@ -173,6 +259,7 @@ def chunk_document_text(self, document_id: str):
                 "chunk_count": result.chunk_count,
                 "total_chars": result.total_chars,
                 "avg_chunk_size": result.avg_chunk_size,
+                "quality_score": quality_score,  # Use validated quality score
             }
             status_record.duration_ms = result.processing_time_ms
             db.commit()
@@ -184,7 +271,7 @@ def chunk_document_text(self, document_id: str):
         logger.info(
             f"Chunking completed for document {document_id}: "
             f"{result.chunk_count} chunks, avg size {result.avg_chunk_size} chars, "
-            f"{result.processing_time_ms}ms"
+            f"quality_score={quality_score:.2f}, {result.processing_time_ms}ms"
         )
 
         return {
@@ -192,6 +279,7 @@ def chunk_document_text(self, document_id: str):
             "document_id": document_id,
             "chunk_count": result.chunk_count,
             "avg_chunk_size": result.avg_chunk_size,
+            "quality_score": quality_score,  # Use validated quality score
             "processing_time_ms": result.processing_time_ms,
         }
 
