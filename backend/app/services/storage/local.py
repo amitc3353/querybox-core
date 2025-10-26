@@ -107,7 +107,10 @@ class LocalStorageProvider(StorageProvider):
             
             logger.info(f"File saved successfully: {path}")
             return path
-            
+
+        except (InvalidPathError, FileNotFoundError, PermissionDeniedError):
+            # Re-raise storage-specific exceptions without wrapping
+            raise
         except OSError as e:
             logger.error(f"Failed to save file {path}: {e}")
             if e.errno == 28:  # No space left on device
@@ -249,32 +252,37 @@ class LocalStorageProvider(StorageProvider):
         try:
             results = []
             search_path = self._get_full_path(prefix) if prefix else self.root_path
-            
+
+            # Resolve root_path to handle symlinks (e.g., /var -> /private/var on macOS)
+            resolved_root = self.root_path.resolve()
+
             if search_path.is_file():
                 # If prefix points to a file, return just that file
-                rel_path = search_path.relative_to(self.root_path)
+                rel_path = search_path.resolve().relative_to(resolved_root)
                 return [str(rel_path)]
-            
+
             if not search_path.is_dir():
                 return []
-            
+
             # Walk directory tree
             if recursive:
                 for root, _, files in os.walk(search_path):
                     root_path = Path(root)
                     for file in files:
                         file_path = root_path / file
-                        rel_path = file_path.relative_to(self.root_path)
+                        # Resolve symlinks before computing relative path
+                        rel_path = file_path.resolve().relative_to(resolved_root)
                         results.append(str(rel_path))
             else:
                 # List only immediate children
                 for item in search_path.iterdir():
                     if item.is_file():
-                        rel_path = item.relative_to(self.root_path)
+                        # Resolve symlinks before computing relative path
+                        rel_path = item.resolve().relative_to(resolved_root)
                         results.append(str(rel_path))
-            
+
             return results
-            
+
         except Exception as e:
             logger.error(f"Failed to list files with prefix {prefix}: {e}")
             raise StorageException(f"Failed to list files: {e}")

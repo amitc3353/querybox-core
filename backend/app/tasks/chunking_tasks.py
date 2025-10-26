@@ -274,6 +274,15 @@ def chunk_document_text(self, document_id: str):
             f"quality_score={quality_score:.2f}, {result.processing_time_ms}ms"
         )
 
+        # Chain embedding generation task (Step 9.2)
+        from app.tasks.embedding_tasks import generate_embeddings
+
+        logger.info(f"Chaining embedding generation task for document {document_id}")
+        generate_embeddings.apply_async(
+            args=[document_id],
+            countdown=5  # Wait 5 seconds before starting
+        )
+
         return {
             "success": True,
             "document_id": document_id,

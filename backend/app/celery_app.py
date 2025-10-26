@@ -91,8 +91,10 @@ celery_app.conf.task_routes = {
         "queue": "chunking",
         "routing_key": "chunking"
     },
-    # Future: Add more queues for embeddings, etc.
-    # "app.tasks.embedding_tasks.*": {"queue": "embeddings"},
+    "app.tasks.embedding_tasks.*": {
+        "queue": "embeddings",
+        "routing_key": "embeddings"
+    },
 }
 
 # Auto-discover tasks in app.tasks package

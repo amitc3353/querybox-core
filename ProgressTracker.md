@@ -103,28 +103,28 @@ Deliverable: Upload PDF → Extract text → Search keywords
 Goal: Intelligent Chunking + Embeddings
 ## Step 9.0 pgvector Setup 
 
-  [ ] Install pgvector extension in PostgreSQL
-  [ ] Create migration to add vector column to embeddings table
-  [ ] Add Vector column type to SQLAlchemy model
-  [ ] Create vector similarity index (HNSW or IVFFlat)
+  [✅] Install pgvector extension in PostgreSQL
+  [✅] Create migration to add vector column to embeddings table
+  [✅] Add Vector column type to SQLAlchemy model
+  [✅] Create vector similarity index (HNSW or IVFFlat)
   Deliverable: Database ready for embeddings
 
  ## Step 9.1: Chunking Improvements (2-3 days)
 
-  [ ] Enhance sentence boundary detection (spaCy/NLTK)
-  [ ] Preserve paragraph/section structure
-  [ ] Add rich metadata (headings, tables, page numbers)
-  [ ] Optimize chunk size for BGE-M3 (512 tokens recommended)
-  [ ] Test chunk quality on 10+ documents
+  [✅] Enhance sentence boundary detection (spaCy/NLTK)
+  [✅] Preserve paragraph/section structure
+  [✅] Add rich metadata (headings, tables, page numbers)
+  [✅] Optimize chunk size for BGE-M3 (512 tokens recommended)
+  [✅] Test chunk quality on 10+ documents
   Deliverable: High-quality chunks ready for embedding
 
  ## Step 9.2: BGE-M3 Embedding Generation (2-3 days)
 
-  [ ] Install BGE-M3 model (sentence-transformers)
-  [ ] Implement embedding generation service
-  [ ] Add batch processing (100 chunks at a time)
-  [ ] Store embeddings in pgvector with proper indexing
-  [ ] Add Celery task for async embedding generation
+  [✅] Install BGE-M3 model (sentence-transformers)
+  [✅] Implement embedding generation service
+  [✅] Add batch processing (100 chunks at a time)
+  [✅] Store embeddings in pgvector with proper indexing
+  [✅] Add Celery task for async embedding generation
   Deliverable: Documents embedded and stored
 
  ## Step 9.3: Vector Similarity Search (2-3 days)

@@ -180,34 +180,40 @@ class StorageProvider(ABC):
     def validate_path(self, path: str) -> bool:
         """
         Validate that a path is safe and valid.
-        
+
         Checks for path traversal attempts and invalid characters.
-        
+
         Args:
             path: Path to validate
-            
+
         Returns:
             True if path is valid, raises exception otherwise
-            
+
         Raises:
             InvalidPathError: If path is invalid
         """
-        # Convert to Path object for validation
-        path_obj = Path(path)
-        
-        # Check for path traversal attempts
-        try:
-            # This will raise ValueError if path tries to escape
-            path_obj.resolve().relative_to(Path("/").resolve())
-        except (ValueError, RuntimeError):
-            from .exceptions import InvalidPathError
-            raise InvalidPathError(path, "Path traversal detected")
-        
-        # Check for invalid characters (null bytes, etc.)
+        from .exceptions import InvalidPathError
+
+        # Check for null bytes
         if '\x00' in path:
-            from .exceptions import InvalidPathError
             raise InvalidPathError(path, "Path contains null bytes")
-        
+
+        # Check for absolute paths
+        if path.startswith('/') or path.startswith('\\'):
+            raise InvalidPathError(path, "Absolute paths not allowed")
+
+        # Check for Windows absolute paths (C:, D:, etc.)
+        if len(path) >= 2 and path[1] == ':':
+            raise InvalidPathError(path, "Absolute paths not allowed")
+
+        # Check for path traversal patterns
+        if '..' in path:
+            raise InvalidPathError(path, "Path traversal detected")
+
+        # Check for other dangerous patterns
+        if '//' in path or '\\\\' in path:
+            raise InvalidPathError(path, "Invalid path separators")
+
         return True
     
     def __repr__(self) -> str:

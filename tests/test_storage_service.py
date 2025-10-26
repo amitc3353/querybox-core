@@ -579,13 +579,17 @@ class TestSecurityValidation:
             "dir/./../../attack",
             "dir///../attack"
         ]
-        
-        for malicious_path in malicious_paths:
-            with pytest.raises(InvalidPathError):
-                # This should be caught by validate_path in the base provider
-                from app.services.storage.base import StorageProvider
-                provider = StorageProvider({})
-                provider.validate_path(malicious_path)
+
+        # Create a temporary directory for testing
+        temp_dir = tempfile.mkdtemp()
+        try:
+            for malicious_path in malicious_paths:
+                with pytest.raises(InvalidPathError):
+                    # This should be caught by validate_path in the provider
+                    provider = LocalStorageProvider({"root_path": temp_dir})
+                    provider.validate_path(malicious_path)
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
     
     def test_filename_injection_prevention(self):
         """Test prevention of filename injection attacks"""

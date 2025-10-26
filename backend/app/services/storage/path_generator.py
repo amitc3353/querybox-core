@@ -55,29 +55,45 @@ class PathGenerator:
         # Normalize unicode characters
         filename = unicodedata.normalize('NFKD', filename)
         filename = filename.encode('ascii', 'ignore').decode('ascii')
-        
+
+        # Replace spaces with underscores first
+        filename = filename.replace(' ', '_')
+
+        # Remove path separators and other dangerous characters early
+        filename = filename.replace('/', '').replace('\\', '').replace('\x00', '').replace('\r', '').replace('\n', '')
+
+        # Remove any path traversal sequences
+        while '..' in filename:
+            filename = filename.replace('..', '')
+
         # Split name and extension
         name_parts = filename.rsplit('.', 1)
         name = name_parts[0]
-        ext = f".{name_parts[1]}" if len(name_parts) > 1 else ""
-        
-        # Replace spaces with underscores
-        name = name.replace(' ', '_')
-        
-        # Remove invalid characters
+        ext = name_parts[1] if len(name_parts) > 1 else ""
+
+        # Remove invalid characters from both name and extension
         name = PathGenerator.VALID_FILENAME_PATTERN.sub('', name)
-        
+        ext = PathGenerator.VALID_FILENAME_PATTERN.sub('', ext)
+
         # Ensure name is not empty
-        if not name:
+        if not name or name == '.':
             name = "unnamed"
         
-        # Truncate if necessary (leave room for extension)
-        max_name_length = PathGenerator.MAX_FILENAME_LENGTH - len(ext)
-        if len(name) > max_name_length:
-            name = name[:max_name_length]
-        
-        # Reconstruct filename
-        sanitized = f"{name}{ext}"
+        # Reconstruct filename with extension
+        if ext:
+            sanitized = f"{name}.{ext}"
+        else:
+            sanitized = name
+
+        # Truncate if necessary
+        if len(sanitized) > PathGenerator.MAX_FILENAME_LENGTH:
+            # If we have an extension, preserve it and truncate the name
+            if ext:
+                max_name_length = PathGenerator.MAX_FILENAME_LENGTH - len(ext) - 1  # -1 for the dot
+                name = name[:max_name_length]
+                sanitized = f"{name}.{ext}"
+            else:
+                sanitized = sanitized[:PathGenerator.MAX_FILENAME_LENGTH]
         
         logger.debug(f"Sanitized filename: '{filename}' -> '{sanitized}'")
         return sanitized

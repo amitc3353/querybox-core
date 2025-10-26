@@ -20,7 +20,22 @@ class Settings(BaseSettings):
     
     # AI/Embeddings
     OPENAI_API_KEY: Optional[str] = None
-    
+
+    # BGE-M3 Embedding Configuration
+    EMBEDDING_MODEL_NAME: str = "BAAI/bge-m3"
+    EMBEDDING_DIMENSION: int = 1024
+    EMBEDDING_MAX_TOKENS: int = 8192
+    EMBEDDING_DEVICE: str = "auto"  # "cuda", "cpu", or "auto"
+    EMBEDDING_BATCH_SIZE: int = 100
+    TRANSFORMERS_CACHE: str = os.path.expanduser("~/.cache/huggingface")
+    HF_HOME: str = os.path.expanduser("~/.cache/huggingface")
+
+    # pgvector Configuration
+    PGVECTOR_INDEX_TYPE: str = "hnsw"
+    PGVECTOR_HNSW_M: int = 16
+    PGVECTOR_HNSW_EF_CONSTRUCTION: int = 64
+    PGVECTOR_MIN_VECTORS_FOR_INDEX: int = 1000
+
     # Security
     API_KEY: str = "dev-key-12345"
     BACKEND_CORS_ORIGINS: List[str] = ["http://localhost:3000"]

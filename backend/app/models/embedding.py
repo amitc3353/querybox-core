@@ -39,8 +39,8 @@ class Embedding(Base):
     chunk_text = Column(Text, nullable=False)
     chunk_tokens = Column(Integer)
 
-    # Embedding vector (1536 dimensions for OpenAI ada-002 / BGE-M3)
-    embedding = Column(Vector(1536))
+    # Embedding vector (1024 dimensions for BGE-M3, 1536 for OpenAI ada-002)
+    embedding = Column(Vector(1024))
 
     # Chunk metadata
     start_position = Column(Integer)
@@ -67,6 +67,7 @@ class Embedding(Base):
     # Processing metadata
     embedding_model = Column(String(100), nullable=False, default='text-embedding-ada-002')
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
     document = relationship("Document", back_populates="embeddings")

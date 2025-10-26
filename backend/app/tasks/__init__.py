@@ -9,9 +9,11 @@ Tasks must be imported here for Celery autodiscovery to work.
 from app.tasks import extraction_tasks  # noqa: F401
 from app.tasks import chunking_tasks  # noqa: F401
 from app.tasks import metadata_tasks  # noqa: F401
+from app.tasks import embedding_tasks  # noqa: F401
 
 __all__ = [
     "extraction_tasks",
     "chunking_tasks",
     "metadata_tasks",
+    "embedding_tasks",
 ]

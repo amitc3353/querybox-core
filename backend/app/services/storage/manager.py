@@ -337,10 +337,13 @@ class StorageManager:
                 storage_url=storage_url,
                 operation_time_ms=operation_time_ms
             )
-            
+
+        except StorageQuotaExceeded:
+            # Re-raise quota exceptions without wrapping them
+            raise
         except Exception as e:
             operation_time_ms = (time.time() - start_time) * 1000
-            
+
             await self._log_operation(
                 "store",
                 initial_path if 'initial_path' in locals() else "unknown",
@@ -350,14 +353,14 @@ class StorageManager:
                 document_id,
                 str(e)
             )
-            
+
             # Cleanup on failure
             if 'final_path' in locals():
                 try:
                     await self.provider.delete_file(final_path)
                 except:
                     pass  # Ignore cleanup errors
-            
+
             raise StorageException(f"Failed to store document: {e}")
     
     async def retrieve_document(self, document_id: UUID) -> bytes:

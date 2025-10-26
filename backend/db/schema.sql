@@ -217,16 +217,31 @@ CREATE TABLE embeddings (
     chunk_tokens INTEGER,                         -- Token count for this chunk
     
     -- Embedding vector (using pgvector extension)
-    embedding vector(1536),                       -- OpenAI ada-002 embedding dimension
-    
+    embedding vector(1024),                       -- BGE-M3 embedding dimension (1024), OpenAI ada-002 uses 1536
+
     -- Chunk metadata
     start_position INTEGER,                       -- Character position in original document
     end_position INTEGER,                         -- End character position
     page_number INTEGER,                          -- Page number if applicable
-    
+
+    -- Enhanced metadata (Step 9.1)
+    section_heading VARCHAR(500),                 -- Section heading for context
+    subsection_heading VARCHAR(500),              -- Subsection heading
+    chunk_type VARCHAR(50) DEFAULT 'paragraph',   -- paragraph, list, table, code, heading
+    paragraph_index INTEGER,                      -- Paragraph index within section
+    semantic_density FLOAT,                       -- Ratio of content words to total words
+    contains_table BOOLEAN DEFAULT false,         -- Contains table data
+    contains_list BOOLEAN DEFAULT false,          -- Contains list items
+    contains_code BOOLEAN DEFAULT false,          -- Contains code blocks
+    contains_equation BOOLEAN DEFAULT false,      -- Contains mathematical equations
+    contains_figure BOOLEAN DEFAULT false,        -- Contains figure references
+    language VARCHAR(10) DEFAULT 'en',            -- Language code
+    chunk_metadata JSONB DEFAULT '{}',            -- Additional metadata
+
     -- Processing metadata
-    embedding_model VARCHAR(100) NOT NULL DEFAULT 'text-embedding-ada-002',
+    embedding_model VARCHAR(100) NOT NULL DEFAULT 'BAAI/bge-m3',
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE,
     
     -- Constraints
     CONSTRAINT embeddings_unique_chunk UNIQUE (document_id, chunk_index)
@@ -281,6 +296,9 @@ CREATE TRIGGER update_documents_updated_at BEFORE UPDATE ON documents
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_processing_status_updated_at BEFORE UPDATE ON processing_status
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_embeddings_updated_at BEFORE UPDATE ON embeddings
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Function to manage document version flags
