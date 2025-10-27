@@ -36,6 +36,12 @@ class Settings(BaseSettings):
     PGVECTOR_HNSW_EF_CONSTRUCTION: int = 64
     PGVECTOR_MIN_VECTORS_FOR_INDEX: int = 1000
 
+    # Vector Search Configuration (Step 9.3)
+    VECTOR_SEARCH_TIMEOUT_MS: int = 500
+    VECTOR_SEARCH_MAX_LIMIT: int = 100
+    VECTOR_SEARCH_DEFAULT_LIMIT: int = 10
+    VECTOR_SEARCH_MIN_SIMILARITY: float = 0.0
+
     # Security
     API_KEY: str = "dev-key-12345"
     BACKEND_CORS_ORIGINS: List[str] = ["http://localhost:3000"]

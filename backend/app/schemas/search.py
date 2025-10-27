@@ -1,11 +1,12 @@
 """
-Search Schemas for Step 8.3 - Simple Keyword Search
+Search Schemas for Step 8.3 & 9.3 - Keyword and Vector Search
 
 Pydantic models for search requests and responses.
 """
 from pydantic import BaseModel, Field, validator
 from typing import List, Optional
 from datetime import datetime
+from enum import Enum
 
 
 class SearchFilters(BaseModel):
@@ -198,3 +199,99 @@ class SearchReadinessReport(BaseModel):
     chunking_details: Optional[dict]
     issues: List[str] = Field(default_factory=list)
     recommendations: List[str] = Field(default_factory=list)
+
+
+# ========================================
+# Step 9.3: Vector Search Schemas
+# ========================================
+
+class VectorSearchQuery(BaseModel):
+    """Vector similarity search request schema"""
+    query: str = Field(..., min_length=1, max_length=1000, description="Natural language search query")
+    filters: Optional[SearchFilters] = Field(None, description="Optional search filters")
+    limit: int = Field(10, ge=1, le=100, description="Maximum number of results to return")
+    offset: int = Field(0, ge=0, description="Pagination offset")
+    similarity_threshold: float = Field(0.0, ge=0.0, le=1.0, description="Minimum cosine similarity (0.0-1.0)")
+    include_embeddings: bool = Field(False, description="Include embedding vectors in response (debug only)")
+
+    @validator('query')
+    def validate_query(cls, v):
+        """Sanitize and validate query string"""
+        # Remove leading/trailing whitespace
+        v = v.strip()
+
+        # Check not empty after stripping
+        if not v:
+            raise ValueError("Query cannot be empty")
+
+        # Remove null bytes
+        if '\x00' in v:
+            raise ValueError("Query contains invalid null bytes")
+
+        return v
+
+    @validator('similarity_threshold')
+    def validate_threshold(cls, v):
+        """Validate similarity threshold"""
+        if v < 0.0 or v > 1.0:
+            raise ValueError("Similarity threshold must be between 0.0 and 1.0")
+        return v
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "query": "How do I reset my password?",
+                "filters": {
+                    "document_types": ["application/pdf"],
+                    "min_quality": 0.7
+                },
+                "limit": 10,
+                "offset": 0,
+                "similarity_threshold": 0.5
+            }
+        }
+
+
+class SearchStrategyEnum(str, Enum):
+    """Available search strategies"""
+    KEYWORD = "keyword"
+    VECTOR = "vector"
+    HYBRID = "hybrid"  # Future - Step 10.1
+
+
+class UnifiedSearchQuery(BaseModel):
+    """Unified search request supporting multiple strategies"""
+    query: str = Field(..., min_length=1, max_length=1000, description="Search query string")
+    strategy: SearchStrategyEnum = Field(
+        SearchStrategyEnum.KEYWORD,
+        description="Search strategy: 'keyword' (fast, exact), 'vector' (semantic), 'hybrid' (future)"
+    )
+    filters: Optional[SearchFilters] = Field(None, description="Optional search filters")
+    limit: int = Field(10, ge=1, le=100, description="Maximum number of results to return")
+    offset: int = Field(0, ge=0, description="Pagination offset")
+    similarity_threshold: Optional[float] = Field(None, ge=0.0, le=1.0, description="Minimum similarity for vector search")
+
+    @validator('query')
+    def validate_query(cls, v):
+        """Sanitize and validate query string"""
+        v = v.strip()
+        if not v:
+            raise ValueError("Query cannot be empty")
+        if '\x00' in v:
+            raise ValueError("Query contains invalid null bytes")
+        return v
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "query": "machine learning algorithms",
+                "strategy": "vector",
+                "filters": {
+                    "document_types": ["application/pdf"],
+                    "min_quality": 0.7
+                },
+                "limit": 10,
+                "offset": 0,
+                "similarity_threshold": 0.5
+            }
+        }
