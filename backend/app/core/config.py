@@ -42,6 +42,20 @@ class Settings(BaseSettings):
     VECTOR_SEARCH_DEFAULT_LIMIT: int = 10
     VECTOR_SEARCH_MIN_SIMILARITY: float = 0.0
 
+    # BM25 Search Configuration (Step 10.1)
+    BM25_K1: float = 1.5  # Term frequency saturation parameter
+    BM25_B: float = 0.75  # Length normalization parameter
+
+    # RRF (Reciprocal Rank Fusion) Configuration (Step 10.1)
+    RRF_K: int = 60  # RRF constant (40-100)
+    RRF_KEYWORD_WEIGHT: float = 0.5  # Default weight for keyword results
+    RRF_VECTOR_WEIGHT: float = 0.5  # Default weight for vector results
+
+    # Hybrid Search Configuration (Step 10.1)
+    HYBRID_KEYWORD_TOP_K: int = 100  # Candidates from keyword search
+    HYBRID_VECTOR_TOP_K: int = 100  # Candidates from vector search
+    HYBRID_ENABLE_PARALLEL: bool = True  # Enable parallel search execution
+
     # Security
     API_KEY: str = "dev-key-12345"
     BACKEND_CORS_ORIGINS: List[str] = ["http://localhost:3000"]

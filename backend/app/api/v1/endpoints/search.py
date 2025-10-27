@@ -335,9 +335,31 @@ async def unified_search(
     **Strategies:**
     - keyword: Full-text search (fast, exact matches)
     - vector: Semantic search (slower, conceptual matches)
-    - hybrid: Combined search (future - Step 10.1)
+    - hybrid: Combined BM25 + vector search with RRF fusion (best accuracy)
 
-    **Example Request:**
+    **Hybrid Search Parameters:**
+    - keyword_weight: Weight for keyword results (default: 0.5)
+    - vector_weight: Weight for vector results (default: 0.5)
+    - keyword_top_k: Candidates from keyword search (default: 100)
+    - vector_top_k: Candidates from vector search (default: 100)
+
+    **Example Request (Hybrid):**
+    ```json
+    {
+      "query": "machine learning algorithms",
+      "strategy": "hybrid",
+      "filters": {
+        "document_types": ["application/pdf"]
+      },
+      "limit": 10,
+      "keyword_weight": 0.5,
+      "vector_weight": 0.5,
+      "keyword_top_k": 100,
+      "vector_top_k": 100
+    }
+    ```
+
+    **Example Request (Vector):**
     ```json
     {
       "query": "machine learning algorithms",
@@ -381,7 +403,11 @@ async def unified_search(
             filters=query.filters,
             limit=query.limit,
             offset=query.offset,
-            similarity_threshold=query.similarity_threshold
+            similarity_threshold=query.similarity_threshold,
+            keyword_weight=query.keyword_weight,
+            vector_weight=query.vector_weight,
+            keyword_top_k=query.keyword_top_k,
+            vector_top_k=query.vector_top_k
         )
 
         # Log search results
@@ -409,17 +435,18 @@ async def unified_search(
             detail=f"Invalid search request: {str(e)}"
         )
 
-    except NotImplementedError as e:
-        # Future features (e.g., hybrid search)
-        logger.warning(
-            "unified_search_not_implemented",
+    except RuntimeError as e:
+        # Runtime errors (e.g., embedding generation, search execution)
+        logger.error(
+            "unified_search_runtime_error",
             query=query.query[:100],
             strategy=query.strategy,
-            error=str(e)
+            error=str(e),
+            exc_info=True
         )
         raise HTTPException(
-            status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail=str(e)
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Search execution failed: {str(e)}"
         )
 
     except Exception as e:

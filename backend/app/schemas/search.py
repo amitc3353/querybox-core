@@ -256,20 +256,26 @@ class SearchStrategyEnum(str, Enum):
     """Available search strategies"""
     KEYWORD = "keyword"
     VECTOR = "vector"
-    HYBRID = "hybrid"  # Future - Step 10.1
+    HYBRID = "hybrid"
 
 
 class UnifiedSearchQuery(BaseModel):
     """Unified search request supporting multiple strategies"""
     query: str = Field(..., min_length=1, max_length=1000, description="Search query string")
     strategy: SearchStrategyEnum = Field(
-        SearchStrategyEnum.KEYWORD,
-        description="Search strategy: 'keyword' (fast, exact), 'vector' (semantic), 'hybrid' (future)"
+        SearchStrategyEnum.HYBRID,
+        description="Search strategy: 'keyword' (fast, exact), 'vector' (semantic), 'hybrid' (BEST - BM25 + vector with RRF fusion, default)"
     )
     filters: Optional[SearchFilters] = Field(None, description="Optional search filters")
     limit: int = Field(10, ge=1, le=100, description="Maximum number of results to return")
     offset: int = Field(0, ge=0, description="Pagination offset")
     similarity_threshold: Optional[float] = Field(None, ge=0.0, le=1.0, description="Minimum similarity for vector search")
+
+    # Hybrid search parameters
+    keyword_weight: Optional[float] = Field(None, ge=0.0, le=1.0, description="Weight for keyword results in hybrid search (0.0-1.0)")
+    vector_weight: Optional[float] = Field(None, ge=0.0, le=1.0, description="Weight for vector results in hybrid search (0.0-1.0)")
+    keyword_top_k: Optional[int] = Field(None, ge=10, le=500, description="Number of candidates from keyword search in hybrid mode")
+    vector_top_k: Optional[int] = Field(None, ge=10, le=500, description="Number of candidates from vector search in hybrid mode")
 
     @validator('query')
     def validate_query(cls, v):
@@ -281,17 +287,32 @@ class UnifiedSearchQuery(BaseModel):
             raise ValueError("Query contains invalid null bytes")
         return v
 
+    @validator('vector_weight')
+    def validate_weights(cls, v, values):
+        """Validate that weights are reasonable"""
+        keyword_weight = values.get('keyword_weight')
+
+        # If both weights are specified, ensure they're not both zero
+        if keyword_weight is not None and v is not None:
+            if keyword_weight == 0.0 and v == 0.0:
+                raise ValueError("Both keyword_weight and vector_weight cannot be zero")
+
+        return v
+
     class Config:
         json_schema_extra = {
             "example": {
                 "query": "machine learning algorithms",
-                "strategy": "vector",
+                "strategy": "hybrid",
                 "filters": {
                     "document_types": ["application/pdf"],
                     "min_quality": 0.7
                 },
                 "limit": 10,
                 "offset": 0,
-                "similarity_threshold": 0.5
+                "keyword_weight": 0.5,
+                "vector_weight": 0.5,
+                "keyword_top_k": 100,
+                "vector_top_k": 100
             }
         }

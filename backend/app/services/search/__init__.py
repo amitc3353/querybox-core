@@ -1,7 +1,7 @@
 """
 Search Services Package
 
-Provides keyword, vector, and unified search functionality for documents and chunks.
+Provides keyword, vector, hybrid, and unified search functionality for documents and chunks.
 """
 from app.services.search.keyword_search_service import (
     KeywordSearchService,
@@ -10,6 +10,18 @@ from app.services.search.keyword_search_service import (
 from app.services.search.vector_search_service import (
     VectorSearchService,
     get_vector_search_service
+)
+from app.services.search.bm25_search_service import (
+    BM25SearchService,
+    get_bm25_search_service
+)
+from app.services.search.rrf_ranker import (
+    RRFRanker,
+    get_rrf_ranker
+)
+from app.services.search.hybrid_search_service import (
+    HybridSearchService,
+    get_hybrid_search_service
 )
 from app.services.search.search_service import (
     SearchService,
@@ -31,6 +43,15 @@ __all__ = [
     # Vector Search
     "VectorSearchService",
     "get_vector_search_service",
+    # BM25 Search
+    "BM25SearchService",
+    "get_bm25_search_service",
+    # RRF Ranker
+    "RRFRanker",
+    "get_rrf_ranker",
+    # Hybrid Search
+    "HybridSearchService",
+    "get_hybrid_search_service",
     # Unified Search
     "SearchService",
     "get_unified_search_service",
