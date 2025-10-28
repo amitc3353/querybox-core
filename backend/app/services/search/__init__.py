@@ -35,6 +35,21 @@ from app.services.search.validators import (
     VectorSearchValidator,
     get_vector_search_validator
 )
+from app.services.search.cross_encoder_service import (
+    CrossEncoderService
+)
+from app.services.search.mmr_ranker import (
+    MMRRanker,
+    get_mmr_ranker
+)
+from app.services.search.deduplication_service import (
+    DeduplicationService,
+    get_deduplication_service
+)
+from app.services.search.reranking_pipeline import (
+    RerankingPipeline,
+    get_reranking_pipeline
+)
 
 __all__ = [
     # Keyword Search
@@ -61,4 +76,15 @@ __all__ = [
     # Vector Search Validation
     "VectorSearchValidator",
     "get_vector_search_validator",
+    # Cross-Encoder Reranking (Step 10.2)
+    "CrossEncoderService",
+    # MMR Ranker (Step 10.2)
+    "MMRRanker",
+    "get_mmr_ranker",
+    # Deduplication (Step 10.2)
+    "DeduplicationService",
+    "get_deduplication_service",
+    # Reranking Pipeline (Step 10.2)
+    "RerankingPipeline",
+    "get_reranking_pipeline",
 ]

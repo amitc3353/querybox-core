@@ -143,9 +143,9 @@ Goal: Hybrid Retrieval + Reranking
 * [] Implement 4-stage retrieval pipeline
 * [] Add metadata filtering
 ## Step 10.2
-* [] Cross-encoder reranking (MiniLM-L6)
-* [] MMR for diversity
-* [] Result deduplication
+* [✅] Cross-encoder reranking (MiniLM-L6)
+* [✅] MMR for diversity
+* [✅] Result deduplication
 ## Step 10.3
 * [] Citation extraction from chunks
 * [] Source tracking and versioning

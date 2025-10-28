@@ -56,6 +56,80 @@ class Settings(BaseSettings):
     HYBRID_VECTOR_TOP_K: int = 100  # Candidates from vector search
     HYBRID_ENABLE_PARALLEL: bool = True  # Enable parallel search execution
 
+    # ========================================
+    # Cross-Encoder Reranking Configuration (Step 10.2)
+    # ========================================
+    CROSS_ENCODER_MODEL_NAME: str = "cross-encoder/ms-marco-MiniLM-L6-v2"
+    CROSS_ENCODER_DEVICE: str = "cpu"  # "cpu" or "cuda" for GPU
+    CROSS_ENCODER_BATCH_SIZE: int = 32
+    CROSS_ENCODER_MAX_LENGTH: int = 512
+    CROSS_ENCODER_NUM_THREADS: int = 4
+    CROSS_ENCODER_CACHE_SIZE: int = 1000
+
+    ENABLE_RERANKING: bool = True
+    RERANK_TOP_K: int = 50
+    RERANK_MIN_TOP_K: int = 10
+    RERANK_MAX_TOP_K: int = 200
+    RERANK_MIN_CANDIDATES: int = 20
+
+    # ========================================
+    # MMR (Maximal Marginal Relevance) Configuration (Step 10.2)
+    # ========================================
+    ENABLE_MMR: bool = True
+    MMR_LAMBDA: float = 0.7  # 0.0 = max diversity, 1.0 = max relevance
+    MMR_MIN_LAMBDA: float = 0.0
+    MMR_MAX_LAMBDA: float = 1.0
+    MMR_MIN_CANDIDATES: int = 10
+
+    # ========================================
+    # Advanced Deduplication Configuration (Step 10.2)
+    # ========================================
+    ENABLE_ADVANCED_DEDUP: bool = True
+    ENABLE_SEMANTIC_DEDUP: bool = True
+    SEMANTIC_DEDUP_THRESHOLD: float = 0.95
+    SEMANTIC_DEDUP_MIN_THRESHOLD: float = 0.80
+    SEMANTIC_DEDUP_MAX_THRESHOLD: float = 0.99
+    CONTENT_HASH_ALGORITHM: str = "sha256"
+
+    # ========================================
+    # Reranking Pipeline Configuration (Step 10.2)
+    # ========================================
+    RERANKING_STAGE_1_ENABLED: bool = True  # Cross-encoder
+    RERANKING_STAGE_2_ENABLED: bool = True  # Deduplication
+    RERANKING_STAGE_3_ENABLED: bool = True  # MMR
+    RERANKING_TIMEOUT_MS: int = 3000
+    RERANKING_MAX_RETRIES: int = 1
+
+    # ========================================
+    # Model Caching & Loading (Step 10.2)
+    # ========================================
+    MODEL_CACHE_DIR: str = "./models/cross_encoder"
+    MODEL_DOWNLOAD_ON_STARTUP: bool = True
+    MODEL_LAZY_LOADING: bool = False
+    MODEL_WARMUP_ON_STARTUP: bool = True
+
+    # ========================================
+    # Rate Limiting - Reranking (Step 10.2)
+    # ========================================
+    RATE_LIMIT_RERANKING: str = "10/minute"
+    MAX_CONCURRENT_RERANKING: int = 5
+
+    # ========================================
+    # Monitoring - Reranking (Step 10.2)
+    # ========================================
+    RERANKING_LOG_LEVEL: str = "INFO"
+    LOG_SLOW_RERANKING: bool = True
+    SLOW_RERANKING_THRESHOLD_MS: int = 300
+    ENABLE_RERANKING_METRICS: bool = True
+    TRACK_MMR_DIVERSITY: bool = True
+    TRACK_DEDUP_STATS: bool = True
+
+    # ========================================
+    # A/B Testing - Reranking (Step 10.2)
+    # ========================================
+    RERANKING_AB_TEST_ENABLED: bool = False
+    RERANKING_AB_TEST_RATIO: float = 0.5
+
     # Security
     API_KEY: str = "dev-key-12345"
     BACKEND_CORS_ORIGINS: List[str] = ["http://localhost:3000"]

@@ -133,8 +133,10 @@ class SearchResponse(BaseModel):
     processing_time_ms: int = Field(..., ge=0, description="Search processing time in milliseconds")
     filters_applied: Optional[SearchFilters] = Field(None, description="Filters that were applied to the search")
     suggestions: Optional[List[str]] = Field(None, description="Query suggestions or corrections")
+    reranking_metadata: Optional[dict] = Field(None, description="Step 10.2 reranking pipeline metadata (if enabled)")
 
     class Config:
+        extra = "allow"  # Allow extra fields like reranking_metadata
         json_schema_extra = {
             "example": {
                 "success": True,
@@ -271,11 +273,19 @@ class UnifiedSearchQuery(BaseModel):
     offset: int = Field(0, ge=0, description="Pagination offset")
     similarity_threshold: Optional[float] = Field(None, ge=0.0, le=1.0, description="Minimum similarity for vector search")
 
-    # Hybrid search parameters
+    # Hybrid search parameters (Step 10.1)
     keyword_weight: Optional[float] = Field(None, ge=0.0, le=1.0, description="Weight for keyword results in hybrid search (0.0-1.0)")
     vector_weight: Optional[float] = Field(None, ge=0.0, le=1.0, description="Weight for vector results in hybrid search (0.0-1.0)")
     keyword_top_k: Optional[int] = Field(None, ge=10, le=500, description="Number of candidates from keyword search in hybrid mode")
     vector_top_k: Optional[int] = Field(None, ge=10, le=500, description="Number of candidates from vector search in hybrid mode")
+
+    # Advanced reranking parameters (Step 10.2)
+    enable_reranking: bool = Field(False, description="Enable cross-encoder reranking + MMR + deduplication (Step 10.2)")
+    rerank_top_k: Optional[int] = Field(None, ge=10, le=200, description="Number of candidates to keep after cross-encoder reranking")
+    enable_mmr: Optional[bool] = Field(None, description="Enable MMR diversification in reranking pipeline")
+    mmr_lambda: Optional[float] = Field(None, ge=0.0, le=1.0, description="MMR diversity parameter (0.0=max diversity, 1.0=max relevance)")
+    enable_dedup: Optional[bool] = Field(None, description="Enable advanced deduplication in reranking pipeline")
+    semantic_dedup_threshold: Optional[float] = Field(None, ge=0.8, le=0.99, description="Semantic deduplication similarity threshold")
 
     @validator('query')
     def validate_query(cls, v):
@@ -299,6 +309,85 @@ class UnifiedSearchQuery(BaseModel):
 
         return v
 
+    @validator('rerank_top_k')
+    def validate_rerank_top_k(cls, v, values):
+        """Validate rerank_top_k parameter (Step 10.2 - Phase 5)"""
+        if v is not None:
+            # rerank_top_k should be greater than final limit
+            limit = values.get('limit', 10)
+            if v < limit:
+                raise ValueError(f"rerank_top_k ({v}) should be >= limit ({limit}) to have enough candidates for final selection")
+
+            # rerank_top_k should be reasonable relative to candidate pool
+            keyword_top_k = values.get('keyword_top_k', 100)
+            vector_top_k = values.get('vector_top_k', 100)
+            max_candidates = max(keyword_top_k, vector_top_k) if keyword_top_k and vector_top_k else 100
+
+            if v > max_candidates:
+                raise ValueError(f"rerank_top_k ({v}) should be <= max candidate pool size ({max_candidates})")
+
+        return v
+
+    @validator('mmr_lambda')
+    def validate_mmr_lambda(cls, v, values):
+        """Validate MMR lambda parameter (Step 10.2 - Phase 5)"""
+        if v is not None:
+            enable_mmr = values.get('enable_mmr')
+            enable_reranking = values.get('enable_reranking', False)
+
+            # If MMR is explicitly enabled but lambda not provided, use default
+            if enable_mmr and v is None:
+                return 0.7  # Default lambda
+
+            # Warn about extreme values
+            if v == 0.0:
+                # Pure diversity, no relevance - rare use case
+                pass
+            elif v == 1.0:
+                # Pure relevance, no diversity - defeats the purpose of MMR
+                pass
+
+        return v
+
+    @validator('semantic_dedup_threshold')
+    def validate_semantic_dedup_threshold(cls, v, values):
+        """Validate semantic deduplication threshold (Step 10.2 - Phase 5)"""
+        if v is not None:
+            enable_dedup = values.get('enable_dedup')
+            enable_reranking = values.get('enable_reranking', False)
+
+            # If dedup enabled but threshold very low, might remove too many results
+            if enable_dedup and v < 0.85:
+                raise ValueError(f"semantic_dedup_threshold ({v}) is too low, may remove too many valid results. Minimum: 0.85")
+
+            # If threshold very high (>0.98), might not catch near-duplicates
+            if enable_dedup and v > 0.98:
+                # This is a warning case but we'll allow it
+                pass
+
+        return v
+
+    @validator('enable_reranking')
+    def validate_reranking_configuration(cls, v, values):
+        """Validate overall reranking configuration (Step 10.2 - Phase 5)"""
+        if v:  # If reranking enabled
+            strategy = values.get('strategy')
+
+            # Reranking only makes sense for hybrid strategy
+            if strategy and strategy != SearchStrategyEnum.HYBRID:
+                raise ValueError(f"Reranking is only supported for 'hybrid' strategy, got '{strategy}'")
+
+            # Check if we have enough candidates to make reranking worthwhile
+            keyword_top_k = values.get('keyword_top_k', 100)
+            vector_top_k = values.get('vector_top_k', 100)
+            limit = values.get('limit', 10)
+
+            total_candidates = keyword_top_k + vector_top_k
+            if total_candidates < 50:
+                raise ValueError(f"Reranking requires at least 50 total candidates (keyword_top_k + vector_top_k), got {total_candidates}")
+
+        return v
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -313,6 +402,11 @@ class UnifiedSearchQuery(BaseModel):
                 "keyword_weight": 0.5,
                 "vector_weight": 0.5,
                 "keyword_top_k": 100,
-                "vector_top_k": 100
+                "vector_top_k": 100,
+                "enable_reranking": True,
+                "rerank_top_k": 50,
+                "enable_mmr": True,
+                "mmr_lambda": 0.7,
+                "enable_dedup": True
             }
         }

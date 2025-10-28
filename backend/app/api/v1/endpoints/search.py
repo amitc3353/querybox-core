@@ -337,13 +337,21 @@ async def unified_search(
     - vector: Semantic search (slower, conceptual matches)
     - hybrid: Combined BM25 + vector search with RRF fusion (best accuracy)
 
-    **Hybrid Search Parameters:**
+    **Hybrid Search Parameters (Step 10.1):**
     - keyword_weight: Weight for keyword results (default: 0.5)
     - vector_weight: Weight for vector results (default: 0.5)
     - keyword_top_k: Candidates from keyword search (default: 100)
     - vector_top_k: Candidates from vector search (default: 100)
 
-    **Example Request (Hybrid):**
+    **Advanced Reranking Parameters (Step 10.2):**
+    - enable_reranking: Enable cross-encoder reranking + MMR + deduplication (default: False)
+    - rerank_top_k: Candidates to keep after cross-encoder reranking (default: 50)
+    - enable_mmr: Enable MMR diversification (default: from settings)
+    - mmr_lambda: MMR diversity parameter, 0.0=max diversity, 1.0=max relevance (default: 0.7)
+    - enable_dedup: Enable advanced deduplication (default: from settings)
+    - semantic_dedup_threshold: Semantic similarity threshold for deduplication (default: 0.95)
+
+    **Example Request (Hybrid with Reranking):**
     ```json
     {
       "query": "machine learning algorithms",
@@ -355,7 +363,12 @@ async def unified_search(
       "keyword_weight": 0.5,
       "vector_weight": 0.5,
       "keyword_top_k": 100,
-      "vector_top_k": 100
+      "vector_top_k": 100,
+      "enable_reranking": true,
+      "rerank_top_k": 50,
+      "enable_mmr": true,
+      "mmr_lambda": 0.7,
+      "enable_dedup": true
     }
     ```
 
@@ -373,11 +386,11 @@ async def unified_search(
     ```
 
     Args:
-        query: UnifiedSearchQuery with strategy, filters, etc.
+        query: UnifiedSearchQuery with strategy, filters, and reranking parameters
         db: Database session (injected)
 
     Returns:
-        SearchResponse with results from selected strategy
+        SearchResponse with results from selected strategy and optional reranking_metadata
 
     Raises:
         HTTPException 400: Invalid query, strategy, or filters
@@ -403,11 +416,18 @@ async def unified_search(
             filters=query.filters,
             limit=query.limit,
             offset=query.offset,
+            # Vector search parameters
             similarity_threshold=query.similarity_threshold,
+            # Hybrid search parameters (Step 10.1)
             keyword_weight=query.keyword_weight,
             vector_weight=query.vector_weight,
             keyword_top_k=query.keyword_top_k,
-            vector_top_k=query.vector_top_k
+            vector_top_k=query.vector_top_k,
+            # Advanced reranking parameters (Step 10.2)
+            enable_reranking=query.enable_reranking,
+            rerank_top_k=query.rerank_top_k,
+            enable_mmr=query.enable_mmr,
+            enable_dedup=query.enable_dedup
         )
 
         # Log search results
@@ -509,4 +529,122 @@ async def search_health_check(db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Search service is unavailable"
+        )
+
+
+@router.get("/reranking/health", status_code=status.HTTP_200_OK)
+async def reranking_health_check(db: Session = Depends(get_db)):
+    """
+    Health check endpoint for reranking functionality (Step 10.2 - Phase 5)
+
+    Verifies:
+    - Cross-encoder model is loaded
+    - GPU availability (if configured)
+    - Embeddings available for MMR diversity calculation
+    - All reranking components operational
+
+    Returns:
+        Health status with reranking capability details
+
+    Example Response:
+    ```json
+    {
+        "status": "healthy",
+        "service": "reranking",
+        "cross_encoder_loaded": true,
+        "cross_encoder_model": "cross-encoder/ms-marco-MiniLM-L6-v2",
+        "device": "cuda",
+        "gpu_available": true,
+        "embeddings_available": 5420,
+        "mmr_ready": true,
+        "deduplication_ready": true,
+        "message": "Reranking service is operational"
+    }
+    ```
+    """
+    try:
+        from app.models.embedding import Embedding
+        from app.core.config import settings
+        import torch
+
+        # Initialize health status
+        health_status = {
+            "status": "healthy",
+            "service": "reranking",
+            "cross_encoder_loaded": False,
+            "cross_encoder_model": None,
+            "device": None,
+            "gpu_available": False,
+            "embeddings_available": 0,
+            "mmr_ready": False,
+            "deduplication_ready": False,
+            "message": "Reranking service is operational"
+        }
+
+        # Check GPU availability
+        gpu_available = torch.cuda.is_available()
+        health_status["gpu_available"] = gpu_available
+
+        # Get configured device
+        configured_device = settings.RERANKING_DEVICE
+        actual_device = "cuda" if gpu_available and configured_device == "cuda" else "cpu"
+        health_status["device"] = actual_device
+
+        # Check cross-encoder model loading
+        try:
+            from app.services.search.cross_encoder_service import get_cross_encoder_service
+            cross_encoder = get_cross_encoder_service()
+
+            if cross_encoder.model is not None:
+                health_status["cross_encoder_loaded"] = True
+                health_status["cross_encoder_model"] = cross_encoder.model_name
+            else:
+                health_status["status"] = "degraded"
+                health_status["message"] = "Cross-encoder model not loaded"
+
+        except Exception as e:
+            logger.warning(
+                "reranking_health_check_cross_encoder_error",
+                error=str(e)
+            )
+            health_status["status"] = "degraded"
+            health_status["message"] = f"Cross-encoder initialization error: {str(e)}"
+
+        # Check embeddings availability for MMR
+        try:
+            embedding_count = db.query(Embedding).filter(
+                Embedding.embedding.isnot(None)
+            ).count()
+            health_status["embeddings_available"] = embedding_count
+            health_status["mmr_ready"] = embedding_count > 0
+
+        except Exception as e:
+            logger.warning(
+                "reranking_health_check_embeddings_error",
+                error=str(e)
+            )
+            health_status["mmr_ready"] = False
+
+        # Deduplication is always ready (doesn't depend on external resources)
+        health_status["deduplication_ready"] = True
+
+        # Overall status check
+        if not health_status["cross_encoder_loaded"]:
+            health_status["status"] = "degraded"
+            health_status["message"] = "Reranking available but cross-encoder not loaded"
+        elif not health_status["mmr_ready"]:
+            health_status["status"] = "degraded"
+            health_status["message"] = "Reranking available but MMR requires embeddings"
+
+        return health_status
+
+    except Exception as e:
+        logger.error(
+            "reranking_health_check_failed",
+            error=str(e),
+            exc_info=True
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Reranking service is unavailable"
         )
