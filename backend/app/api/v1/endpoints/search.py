@@ -2,17 +2,20 @@
 Search API Endpoints for Step 8.3 & 9.3 - Keyword and Vector Search
 
 Provides keyword-based and semantic vector search functionality.
+Step 10.3: Added citation extraction support
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 import structlog
+import time
 
 from app.schemas.search import (
     SearchQuery,
     SearchResponse,
     VectorSearchQuery,
-    UnifiedSearchQuery
+    UnifiedSearchQuery,
+    SearchResponseWithCitations
 )
 from app.services.search import (
     get_search_service,
@@ -324,13 +327,23 @@ async def semantic_search(
         )
 
 
-@router.post("/unified", response_model=SearchResponse, status_code=status.HTTP_200_OK)
+@router.post("/unified", response_model=SearchResponseWithCitations, status_code=status.HTTP_200_OK)
 async def unified_search(
     query: UnifiedSearchQuery,
+    citations: bool = Query(
+        default=True,
+        description="Enable citation extraction and source tracking (Step 10.3)"
+    ),
+    citation_limit: int = Query(
+        default=3,
+        ge=1,
+        le=5,
+        description="Maximum citations per result (1-5, default: 3)"
+    ),
     db: Session = Depends(get_db)
 ):
     """
-    Unified search endpoint supporting multiple strategies
+    Unified search endpoint supporting multiple strategies with citation extraction
 
     **Strategies:**
     - keyword: Full-text search (fast, exact matches)
@@ -350,6 +363,10 @@ async def unified_search(
     - mmr_lambda: MMR diversity parameter, 0.0=max diversity, 1.0=max relevance (default: 0.7)
     - enable_dedup: Enable advanced deduplication (default: from settings)
     - semantic_dedup_threshold: Semantic similarity threshold for deduplication (default: 0.95)
+
+    **Citation Extraction Parameters (Step 10.3):**
+    - citations: Enable citation extraction (default: True)
+    - citation_limit: Max citations per result (default: 3, max: 5)
 
     **Example Request (Hybrid with Reranking):**
     ```json
@@ -397,12 +414,16 @@ async def unified_search(
         HTTPException 500: Database or server error
     """
     try:
+        start_time = time.time()
+
         # Log search request
         logger.info(
             "unified_search_request",
             query=query.query[:100],
             strategy=query.strategy,
-            limit=query.limit
+            limit=query.limit,
+            citations_enabled=citations,
+            citation_limit=citation_limit
         )
 
         # Get services
@@ -430,6 +451,77 @@ async def unified_search(
             enable_dedup=query.enable_dedup
         )
 
+        # Step 10.3: Extract citations if enabled
+        if citations:
+            try:
+                from app.services.search.citation_extraction_service import get_citation_service
+
+                citation_service = get_citation_service(db)
+                enriched_results = citation_service.extract_citations(
+                    search_results=response.results,
+                    citation_limit=citation_limit
+                )
+
+                logger.info(
+                    "citation_extraction_completed",
+                    num_results=len(enriched_results),
+                    total_citations=sum(len(r.citations) for r in enriched_results)
+                )
+
+                # Calculate total processing time
+                total_time_ms = int((time.time() - start_time) * 1000)
+
+                # Return response with citations
+                return SearchResponseWithCitations(
+                    success=response.success,
+                    query=response.query,
+                    total_results=response.total_results,
+                    returned_results=len(enriched_results),
+                    results=enriched_results,
+                    processing_time_ms=total_time_ms,
+                    citations_enabled=True,
+                    filters_applied=response.filters_applied,
+                    reranking_metadata=response.reranking_metadata if hasattr(response, 'reranking_metadata') else None
+                )
+
+            except Exception as e:
+                logger.error(
+                    "citation_extraction_failed",
+                    error=str(e),
+                    exc_info=True
+                )
+                # Graceful degradation: return results without citations
+                from app.schemas.search import SearchResultItemWithCitations
+
+                enriched_results = [
+                    SearchResultItemWithCitations(**r.dict())
+                    for r in response.results
+                ]
+
+                total_time_ms = int((time.time() - start_time) * 1000)
+
+                return SearchResponseWithCitations(
+                    success=response.success,
+                    query=response.query,
+                    total_results=response.total_results,
+                    returned_results=len(enriched_results),
+                    results=enriched_results,
+                    processing_time_ms=total_time_ms,
+                    citations_enabled=False,
+                    filters_applied=response.filters_applied,
+                    reranking_metadata=response.reranking_metadata if hasattr(response, 'reranking_metadata') else None
+                )
+
+        # No citations requested - convert to SearchResponseWithCitations format
+        from app.schemas.search import SearchResultItemWithCitations
+
+        enriched_results = [
+            SearchResultItemWithCitations(**r.dict())
+            for r in response.results
+        ]
+
+        total_time_ms = int((time.time() - start_time) * 1000)
+
         # Log search results
         logger.info(
             "unified_search_completed",
@@ -437,10 +529,21 @@ async def unified_search(
             strategy=query.strategy,
             total_results=response.total_results,
             returned_results=response.returned_results,
-            processing_time_ms=response.processing_time_ms
+            processing_time_ms=total_time_ms,
+            citations_enabled=False
         )
 
-        return response
+        return SearchResponseWithCitations(
+            success=response.success,
+            query=response.query,
+            total_results=response.total_results,
+            returned_results=len(enriched_results),
+            results=enriched_results,
+            processing_time_ms=total_time_ms,
+            citations_enabled=False,
+            filters_applied=response.filters_applied,
+            reranking_metadata=response.reranking_metadata if hasattr(response, 'reranking_metadata') else None
+        )
 
     except ValueError as e:
         # Validation errors (invalid strategy, query, etc.)

@@ -130,6 +130,31 @@ class Settings(BaseSettings):
     RERANKING_AB_TEST_ENABLED: bool = False
     RERANKING_AB_TEST_RATIO: float = 0.5
 
+    # ========================================
+    # Citation Extraction Configuration (Step 10.3)
+    # ========================================
+    ENABLE_CITATIONS: bool = True
+    CITATION_LIMIT_DEFAULT: int = 3
+    CITATION_LIMIT_MAX: int = 5
+    EXPOSE_ABSOLUTE_POSITIONS: bool = False  # Security: use relative positions in production
+
+    # SpaCy NLP Configuration
+    SPACY_MODEL_NAME: str = "en_core_web_sm"
+    SPACY_DISABLE_PIPES: List[str] = ["ner", "parser"]  # Disable for performance
+
+    # Citation Cache Configuration
+    CITATION_CACHE_ENABLED: bool = True
+    CITATION_CACHE_TTL_SECONDS: int = 900  # 15 minutes
+
+    # Citation Extraction Performance
+    CITATION_TIMEOUT_MS: int = 200
+    CITATION_BATCH_SIZE: int = 10
+
+    # Citation Scoring Thresholds
+    CITATION_MIN_CONFIDENCE: float = 0.3
+    CITATION_MIN_WORD_COUNT: int = 10
+    CITATION_MAX_WORD_COUNT: int = 50
+
     # Security
     API_KEY: str = "dev-key-12345"
     BACKEND_CORS_ORIGINS: List[str] = ["http://localhost:3000"]

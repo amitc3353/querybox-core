@@ -410,3 +410,140 @@ class UnifiedSearchQuery(BaseModel):
                 "enable_dedup": True
             }
         }
+
+
+# ========================================
+# Step 10.3: Citation Extraction Schemas
+# ========================================
+
+class CitationPosition(BaseModel):
+    """Position of citation in source document"""
+    start: int = Field(..., description="Start character offset in document")
+    end: int = Field(..., description="End character offset in document")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "start": 1234,
+                "end": 1298
+            }
+        }
+
+
+class Citation(BaseModel):
+    """Single citation with source tracking"""
+    text: str = Field(..., max_length=500, description="Citation text excerpt")
+    page: Optional[int] = Field(None, ge=1, description="Page number in source document")
+    section: Optional[str] = Field(None, max_length=500, description="Section heading in document")
+    position: CitationPosition = Field(..., description="Character position in document")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Citation confidence score (0.0-1.0)")
+    source_context: str = Field(..., description="Human-readable source context (e.g., 'Page 12, Section 3.2')")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "text": "RAG systems improve accuracy by 40% compared to baseline LLMs",
+                "page": 12,
+                "section": "3.2 Performance Analysis",
+                "position": {
+                    "start": 1234,
+                    "end": 1298
+                },
+                "confidence": 0.95,
+                "source_context": "Page 12, 3.2 Performance Analysis"
+            }
+        }
+
+
+class SearchResultItemWithCitations(SearchResultItem):
+    """Search result with citation metadata"""
+    citations: List[Citation] = Field(
+        default_factory=list,
+        description="Extracted citations from this chunk"
+    )
+    snippet_highlighted: Optional[str] = Field(
+        None,
+        description="Snippet with citation highlighting (HTML <mark> tags)"
+    )
+    source_page: Optional[int] = Field(
+        None,
+        ge=1,
+        description="Primary source page number"
+    )
+    source_section: Optional[str] = Field(
+        None,
+        max_length=500,
+        description="Primary source section heading"
+    )
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "document_id": "550e8400-e29b-41d4-a716-446655440000",
+                "document_name": "RAG_Performance_Study.pdf",
+                "relevance_score": 0.92,
+                "snippet": "...RAG systems improve accuracy by 40%...",
+                "chunk_index": 5,
+                "citations": [
+                    {
+                        "text": "RAG systems improve accuracy by 40%",
+                        "page": 12,
+                        "section": "3.2 Performance Analysis",
+                        "position": {"start": 1234, "end": 1298},
+                        "confidence": 0.95,
+                        "source_context": "Page 12, 3.2 Performance Analysis"
+                    }
+                ],
+                "snippet_highlighted": "...RAG systems <mark data-page='12'>improve accuracy by 40%</mark>...",
+                "source_page": 12,
+                "source_section": "3.2 Performance Analysis"
+            }
+        }
+
+
+class SearchResponseWithCitations(BaseModel):
+    """Search response with citations"""
+    success: bool = Field(..., description="Whether the search was successful")
+    query: str = Field(..., description="The search query that was executed")
+    total_results: int = Field(..., ge=0, description="Total number of matching documents")
+    returned_results: int = Field(..., ge=0, description="Number of results returned in this response")
+    results: List[SearchResultItemWithCitations] = Field(
+        default_factory=list,
+        description="Search results with citations"
+    )
+    processing_time_ms: int = Field(..., ge=0, description="Search processing time in milliseconds")
+    citations_enabled: bool = Field(True, description="Whether citation extraction was enabled")
+    filters_applied: Optional[SearchFilters] = Field(None, description="Filters that were applied to the search")
+    reranking_metadata: Optional[dict] = Field(None, description="Reranking pipeline metadata (if enabled)")
+
+    class Config:
+        extra = "allow"
+        json_schema_extra = {
+            "example": {
+                "success": True,
+                "query": "machine learning algorithms",
+                "total_results": 47,
+                "returned_results": 10,
+                "results": [
+                    {
+                        "document_id": "550e8400-e29b-41d4-a716-446655440000",
+                        "document_name": "ML_Research.pdf",
+                        "relevance_score": 0.92,
+                        "snippet": "...machine learning algorithms...",
+                        "citations": [
+                            {
+                                "text": "ML algorithms improve performance by 40%",
+                                "page": 5,
+                                "section": "Results",
+                                "position": {"start": 100, "end": 145},
+                                "confidence": 0.9,
+                                "source_context": "Page 5, Results"
+                            }
+                        ],
+                        "source_page": 5
+                    }
+                ],
+                "processing_time_ms": 450,
+                "citations_enabled": True
+            }
+        }
