@@ -155,6 +155,16 @@ class Settings(BaseSettings):
     CITATION_MIN_WORD_COUNT: int = 10
     CITATION_MAX_WORD_COUNT: int = 50
 
+    # ========================================
+    # Ollama LLM Configuration (Step 11.1)
+    # ========================================
+    OLLAMA_BASE_URL: str = "http://localhost:11434"
+    OLLAMA_MODEL: str = "qwen2:7b"
+    OLLAMA_TIMEOUT: int = 60  # Timeout in seconds
+    OLLAMA_TEMPERATURE: float = 0.2  # Default temperature for answer generation
+    OLLAMA_MAX_TOKENS: int = 2000  # Maximum tokens for completion
+    OLLAMA_CONTEXT_TOKENS: int = 6000  # Maximum tokens for context passages
+
     # Security
     API_KEY: str = "dev-key-12345"
     BACKEND_CORS_ORIGINS: List[str] = ["http://localhost:3000"]

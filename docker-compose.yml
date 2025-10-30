@@ -1,0 +1,94 @@
+version: '3.8'
+
+services:
+  # ========================================
+  # Ollama LLM Service (Step 11.1)
+  # ========================================
+  ollama:
+    image: ollama/ollama:latest
+    container_name: querybox-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    deploy:
+      resources:
+        limits:
+          memory: 12G
+        # GPU support (uncomment if you have NVIDIA GPU)
+        # reservations:
+        #   devices:
+        #     - driver: nvidia
+        #       count: 1
+        #       capabilities: [gpu]
+    restart: unless-stopped
+    networks:
+      - querybox-network
+
+  # ========================================
+  # PostgreSQL Database
+  # ========================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: querybox-postgres
+    environment:
+      POSTGRES_USER: querybox
+      POSTGRES_PASSWORD: querybox_dev_2024
+      POSTGRES_DB: querybox_core
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - querybox-network
+
+  # ========================================
+  # Redis Cache
+  # ========================================
+  redis:
+    image: redis:7-alpine
+    container_name: querybox-redis
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - querybox-network
+
+  # ========================================
+  # MinIO Object Storage
+  # ========================================
+  minio:
+    image: minio/minio:latest
+    container_name: querybox-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    restart: unless-stopped
+    networks:
+      - querybox-network
+
+volumes:
+  ollama_models:
+    driver: local
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  minio_data:
+    driver: local
+
+networks:
+  querybox-network:
+    driver: bridge

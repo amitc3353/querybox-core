@@ -30,7 +30,7 @@ High-performance document processing and retrieval system with accurate citation
 
 - **Backend**: FastAPI, PostgreSQL + pgvector, Redis, Celery
 - **Frontend**: Next.js 14, TypeScript, Tailwind CSS
-- **AI/ML**: LangChain, OpenAI Embeddings
+- **AI/ML**: Ollama + Qwen2-7B (local LLM), BGE-M3 Embeddings
 - **Infrastructure**: Docker, S3-compatible storage
 
 ## 🚦 Quick Start
@@ -83,6 +83,72 @@ cd frontend
 npm install
 npm run dev
 ```
+
+### Ollama Setup (Step 11.1 - Answer Generation)
+
+QueryboxCore uses Ollama with Qwen2-7B for local, cost-free answer generation.
+
+**1. Start Ollama Service**
+```bash
+docker-compose up -d ollama
+```
+
+**2. Pull Qwen2-7B Model (4.7GB download)**
+```bash
+docker exec -it querybox-ollama ollama pull qwen2:7b
+```
+
+**3. Verify Installation**
+```bash
+# Check Ollama is running
+curl http://localhost:11434/api/tags
+
+# Test generation
+curl http://localhost:11434/api/generate -d '{
+  "model": "qwen2:7b",
+  "prompt": "What is RAG?",
+  "stream": false
+}'
+```
+
+**4. Check Health via API**
+```bash
+curl http://localhost:8000/api/v1/answer/health/ollama
+```
+
+**Configuration (Optional)**
+
+Edit `backend/app/core/config.py` or set environment variables:
+```python
+OLLAMA_BASE_URL = "http://localhost:11434"  # Ollama server URL
+OLLAMA_MODEL = "qwen2:7b"                   # Model to use
+OLLAMA_TIMEOUT = 60                          # Request timeout (seconds)
+OLLAMA_TEMPERATURE = 0.2                     # Generation temperature
+```
+
+**GPU Support (Optional)**
+
+For faster generation with NVIDIA GPU:
+```yaml
+# Uncomment in docker-compose.yml:
+# deploy:
+#   resources:
+#     reservations:
+#       devices:
+#         - driver: nvidia
+#           count: 1
+#           capabilities: [gpu]
+```
+
+**System Requirements**
+- **CPU-only**: 8GB RAM minimum, 12GB recommended
+- **With GPU**: 8GB RAM + NVIDIA GPU with 6GB+ VRAM
+- **Storage**: 5GB for Qwen2-7B model
+
+**Performance**
+- CPU: ~5-10s per answer (2-3 QPS)
+- GPU: ~2-3s per answer (10+ QPS)
+- Cost: $0 per query (vs $0.05-0.10 with cloud APIs)
 
 ## 📊 Performance Benchmarks
 
