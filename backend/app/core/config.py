@@ -188,6 +188,56 @@ class Settings(BaseSettings):
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/2"
     TASK_QUEUE_BACKEND: str = "celery"  # "celery" or "kafka" (future)
 
+    # ========================================
+    # Chain-of-Verification Configuration (Step 11.2)
+    # ========================================
+
+    # Verification Feature Flags
+    VERIFICATION_ENABLED: bool = True  # Global enable/disable
+    VERIFICATION_DEFAULT_ON: bool = False  # Default for API requests (opt-in)
+
+    # Feature-specific flags
+    ENABLE_QUOTE_MATCHING: bool = True
+    ENABLE_VERIFICATION_QUESTIONS: bool = True
+    ENABLE_HALLUCINATION_DETECTION: bool = True
+    ENABLE_CONTRADICTION_CHECK: bool = True  # LLM-based, can disable for speed
+
+    # Performance Tuning
+    VERIFICATION_TIMEOUT_SECONDS: int = 120  # Total verification timeout
+    VERIFICATION_QUESTION_TIMEOUT: int = 60  # Per-question timeout
+    VERIFICATION_MAX_QUESTIONS: int = 10  # Prevent DOS
+    VERIFICATION_MAX_PROPOSITIONS: int = 10  # Limit proposition count
+
+    # Quote Matching Configuration
+    QUOTE_SIMILARITY_THRESHOLD: float = 0.85  # Fuzzy match threshold (0-1)
+    QUOTE_MAX_MATCHES_PER_PROPOSITION: int = 5  # Top-k matches to store
+    QUOTE_MATCHING_TIMEOUT_MS: int = 100  # Per-proposition timeout
+
+    # Hallucination Detection
+    HALLUCINATION_PROBABILITY_THRESHOLD: float = 0.3  # Flag answers above this
+    HALLUCINATION_AUTO_REMOVE_THRESHOLD: float = 0.7  # Auto-remove claims above this
+    HALLUCINATION_CONTRADICTION_CHECK: bool = True  # Enable LLM contradiction check
+
+    # Caching (3-level strategy)
+    VERIFICATION_CACHE_TTL_SECONDS: int = 3600  # L1: 1 hour
+    QUOTE_MATCH_CACHE_TTL_SECONDS: int = 86400  # L2: 24 hours
+    VERIFICATION_QUESTION_CACHE_TTL_SECONDS: int = 604800  # L3: 1 week
+
+    # Rate Limiting - Verification
+    VERIFICATION_RATE_LIMIT_PER_MINUTE: int = 5  # Verified answers per minute
+    VERIFICATION_RATE_LIMIT_PER_HOUR: int = 50  # Hourly limit
+
+    # Resource Limits
+    MAX_CONCURRENT_VERIFICATIONS: int = 10  # Redis-based semaphore
+    MAX_CONCURRENT_QUOTE_MATCHES: int = 20  # Per verification
+    MAX_CONCURRENT_LLM_CALLS: int = 5  # Per verification
+    MAX_VERIFICATION_MEMORY_MB: int = 100  # Per request
+
+    # Monitoring - Verification
+    ENABLE_VERIFICATION_METRICS: bool = True
+    LOG_VERIFICATION_RESULTS: bool = True
+    TRACK_HALLUCINATION_TRENDS: bool = True
+
     class Config:
         env_file = ".env"
         case_sensitive = True

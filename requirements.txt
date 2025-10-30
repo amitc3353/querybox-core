@@ -43,6 +43,7 @@ sentence-transformers==2.7.0
 torch==2.3.0
 transformers==4.40.0
 scikit-learn==1.4.2
+rapidfuzz==3.6.1
 
 # Vector database
 pgvector==0.2.4
