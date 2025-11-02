@@ -16,6 +16,7 @@ import structlog
 from app.schemas.verification import VerifiedAnswerResponse, QuoteMatch, VerificationAnswer
 from app.schemas.citation_confidence import PropConfidence, ConfidenceBreakdown
 from app.core.config import settings
+from app.core.verification_profiles import get_active_profile, VerificationProfile
 
 logger = structlog.get_logger(__name__)
 
@@ -51,23 +52,31 @@ class ConfidenceCalculator:
     4. Citation count (10%): Number of supporting sources (diversity)
     """
 
-    def __init__(self, weights: Optional[ConfidenceWeights] = None):
+    def __init__(self, weights: Optional[ConfidenceWeights] = None, profile: Optional[VerificationProfile] = None):
         """
         Initialize confidence calculator with weights.
 
         Args:
-            weights: Custom weights (default: 40/35/15/10 split)
+            weights: Custom weights (overrides profile weights if provided)
+            profile: VerificationProfile to use (loads from settings if not provided)
         """
-        # Try to get weights from settings, fallback to defaults
-        self.weights = weights or ConfidenceWeights(
-            passage_relevance=getattr(settings, 'CONFIDENCE_WEIGHT_PASSAGE_RELEVANCE', 0.40),
-            quote_quality=getattr(settings, 'CONFIDENCE_WEIGHT_QUOTE_QUALITY', 0.35),
-            verification_agreement=getattr(settings, 'CONFIDENCE_WEIGHT_VERIFICATION', 0.15),
-            citation_count=getattr(settings, 'CONFIDENCE_WEIGHT_CITATION_COUNT', 0.10),
-        )
+        # Load profile
+        self.profile = profile or get_active_profile()
+
+        # Use custom weights if provided, otherwise load from profile
+        if weights:
+            self.weights = weights
+        else:
+            self.weights = ConfidenceWeights(
+                passage_relevance=self.profile.confidence_passage_relevance_weight,
+                quote_quality=self.profile.confidence_quote_quality_weight,
+                verification_agreement=self.profile.confidence_verification_agreement_weight,
+                citation_count=self.profile.confidence_citation_count_weight,
+            )
 
         logger.info(
             "ConfidenceCalculator initialized",
+            verification_level=self.profile.level.value,
             weights=self.weights
         )
 

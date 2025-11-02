@@ -533,6 +533,54 @@ class TestVerificationServiceCaching:
         assert len(key2) > 10
 
 
+class TestVerificationServiceProfiles:
+    """Test verification service with different profiles - Step 11.4."""
+
+    def test_service_loads_active_profile(self):
+        """Test that VerificationService loads active profile."""
+        from app.core.verification_profiles import get_active_profile
+
+        service = VerificationService(cache=None)
+        active_profile = get_active_profile()
+
+        # Service should use active profile
+        assert service.profile.level == active_profile.level
+        assert service.profile.hallucination_auto_remove_threshold == \
+               active_profile.hallucination_auto_remove_threshold
+
+    def test_service_uses_profile_temperature(self):
+        """Test that VerificationService uses profile temperature."""
+        from app.core.verification_profiles import HIGH_PROFILE
+
+        service = VerificationService(cache=None, profile=HIGH_PROFILE)
+
+        # Should use HIGH profile temperature
+        assert service.profile.verification_temperature == 0.10
+
+    def test_service_uses_profile_auto_remove_threshold(self):
+        """Test that VerificationService uses profile auto-remove threshold."""
+        from app.core.verification_profiles import VERY_HIGH_PROFILE, VERY_LOW_PROFILE
+
+        # VERY_HIGH service
+        very_high_service = VerificationService(cache=None, profile=VERY_HIGH_PROFILE)
+        assert very_high_service.profile.hallucination_auto_remove_threshold == 0.50
+
+        # VERY_LOW service
+        very_low_service = VerificationService(cache=None, profile=VERY_LOW_PROFILE)
+        assert very_low_service.profile.hallucination_auto_remove_threshold == 1.00
+
+    def test_service_respects_custom_profile(self):
+        """Test that VerificationService respects custom profile."""
+        from app.core.verification_profiles import MEDIUM_PROFILE
+
+        service = VerificationService(cache=None, profile=MEDIUM_PROFILE)
+
+        # Should use MEDIUM profile
+        assert service.profile.level.value == "MEDIUM"
+        assert service.profile.quote_similarity_threshold == 0.75
+        assert service.profile.strict_mode is False
+
+
 if __name__ == "__main__":
     # Run tests
     pytest.main([__file__, "-v", "-s"])

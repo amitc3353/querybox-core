@@ -12,6 +12,7 @@ import structlog
 from app.schemas.verification import VerifiedAnswerResponse
 from app.schemas.citation_confidence import AbstentionDecision, AbstentionReason
 from app.core.config import settings
+from app.core.verification_profiles import get_active_profile, VerificationProfile
 
 logger = structlog.get_logger(__name__)
 
@@ -21,8 +22,8 @@ class AbstentionService:
     Multi-factor abstention decision engine.
 
     Decides whether to abstain from answering based on:
-    1. Low confidence (<0.3 by default)
-    2. High hallucination probability (>0.7 by default)
+    1. Low confidence (threshold from profile)
+    2. High hallucination probability (threshold from profile)
     3. No supporting evidence (no quote matches)
     4. Verification failed
 
@@ -32,24 +33,27 @@ class AbstentionService:
     def __init__(
         self,
         low_confidence_threshold: float = None,
-        high_hallucination_threshold: float = None
+        high_hallucination_threshold: float = None,
+        profile: VerificationProfile = None
     ):
         """
         Initialize abstention service with thresholds.
 
         Args:
-            low_confidence_threshold: Threshold for low confidence abstention (default from settings)
-            high_hallucination_threshold: Threshold for high hallucination abstention (default from settings)
+            low_confidence_threshold: Threshold for low confidence abstention (overrides profile if provided)
+            high_hallucination_threshold: Threshold for high hallucination abstention (overrides profile if provided)
+            profile: VerificationProfile to use (loads from settings if not provided)
         """
-        self.low_confidence_threshold = low_confidence_threshold or getattr(
-            settings, 'LOW_CONFIDENCE_THRESHOLD', 0.3
-        )
-        self.high_hallucination_threshold = high_hallucination_threshold or getattr(
-            settings, 'HIGH_HALLUCINATION_THRESHOLD', 0.7
-        )
+        # Load profile
+        self.profile = profile or get_active_profile()
+
+        # Use explicit thresholds if provided, otherwise use profile
+        self.low_confidence_threshold = low_confidence_threshold or self.profile.low_confidence_threshold
+        self.high_hallucination_threshold = high_hallucination_threshold or self.profile.high_hallucination_threshold
 
         logger.info(
             "AbstentionService initialized",
+            verification_level=self.profile.level.value,
             low_confidence_threshold=self.low_confidence_threshold,
             high_hallucination_threshold=self.high_hallucination_threshold,
         )

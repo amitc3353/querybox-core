@@ -165,10 +165,29 @@ Goal: Answer Generation with Verification
 * [] Self-questioning phase
 * [] Exact quote matching
 ## Step 11.3
-* [] Abstention logic (can't answer = say so)
-* [] Confidence scoring
-* [] Citation formatting [1][2]
+* [✅] Abstention logic (can't answer = say so)
+* [✅] Confidence scoring
+* [✅] Citation formatting [1][2]
 Deliverable: /answer endpoint with verified citations
+
+## Step 11.4: Configurable Verification Profiles (Completed Dec 2024)
+* [✅] Create verification_profiles.py with 5 preset levels
+  - VERY_HIGH: Maximum strictness for legal/medical (>98% accuracy)
+  - HIGH: Production default (>95% accuracy)
+  - MEDIUM: Balanced for internal tools (>90% accuracy)
+  - LOW: Lenient for exploratory queries (>85% accuracy)
+  - VERY_LOW: Minimal verification for speed (>80% accuracy)
+* [✅] Integrate profile system with all services
+  - QuoteMatchingService: Uses profile similarity thresholds
+  - HallucinationDetector: Uses profile weights and contradiction settings
+  - ConfidenceCalculator: Uses profile confidence weights
+  - AbstentionService: Uses profile abstention thresholds
+  - VerificationService: Uses profile temperature and removal thresholds
+* [✅] Add VERIFICATION_LEVEL setting to config and .env.example
+* [✅] Implement profile validation and caching
+* [✅] Write comprehensive unit tests for all profiles
+* [✅] Create integration tests for verification levels
+Deliverable: Single VERIFICATION_LEVEL setting controls all verification parameters
 
 ### Step 12 (Dec 2-8)
 Goal: Speed & Scale Optimization

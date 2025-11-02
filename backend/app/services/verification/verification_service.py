@@ -40,6 +40,7 @@ from app.schemas.verification import (
 )
 from app.core.config import settings
 from app.core.metrics import VerificationMetricsRecorder
+from app.core.verification_profiles import get_active_profile, VerificationProfile
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +67,6 @@ class VerificationService:
     VERIFICATION_TIMEOUT_SECONDS = getattr(settings, 'VERIFICATION_TIMEOUT_SECONDS', 120)
     VERIFICATION_QUESTION_TIMEOUT = getattr(settings, 'VERIFICATION_QUESTION_TIMEOUT', 60)
     MAX_VERIFICATION_QUESTIONS = getattr(settings, 'VERIFICATION_MAX_QUESTIONS', 10)
-    HALLUCINATION_AUTO_REMOVE_THRESHOLD = getattr(settings, 'HALLUCINATION_AUTO_REMOVE_THRESHOLD', 0.7)
 
     # Cache TTLs
     VERIFICATION_CACHE_TTL = getattr(settings, 'VERIFICATION_CACHE_TTL_SECONDS', 3600)  # 1 hour
@@ -80,7 +80,8 @@ class VerificationService:
         quote_matcher: Optional[QuoteMatchingService] = None,
         question_generator: Optional[VerificationQuestionGenerator] = None,
         hallucination_detector: Optional[HallucinationDetector] = None,
-        cache: Optional[Redis] = None
+        cache: Optional[Redis] = None,
+        profile: Optional[VerificationProfile] = None
     ):
         """
         Initialize verification service with dependencies.
@@ -92,6 +93,7 @@ class VerificationService:
             question_generator: VerificationQuestionGenerator
             hallucination_detector: HallucinationDetector
             cache: Redis client for caching
+            profile: VerificationProfile (loads from settings if not provided)
         """
         self.ollama = ollama_client or get_ollama_client()
         self.answer_service = answer_service or AnswerService(cache)
@@ -100,9 +102,14 @@ class VerificationService:
         self.hallucination_detector = hallucination_detector or HallucinationDetector(self.ollama)
         self.cache = cache
 
+        # Load active verification profile
+        self.profile = profile or get_active_profile()
+
         logger.info(
-            "VerificationService initialized "
-            f"(cache={'enabled' if cache else 'disabled'})"
+            "VerificationService initialized",
+            cache='enabled' if cache else 'disabled',
+            verification_level=self.profile.level.value,
+            auto_remove_threshold=self.profile.hallucination_auto_remove_threshold
         )
 
     async def verify_answer(
@@ -469,7 +476,7 @@ class VerificationService:
             response = await asyncio.wait_for(
                 self.ollama.generate(
                     prompt=prompt,
-                    temperature=0.1,  # More deterministic than baseline (0.2)
+                    temperature=self.profile.verification_temperature,  # From active profile
                     max_tokens=500    # Shorter than baseline (2000)
                 ),
                 timeout=self.VERIFICATION_QUESTION_TIMEOUT
@@ -701,7 +708,7 @@ ANSWER:"""
             VerifiedAnswerResponse with verification metadata
         """
         # Determine verified answer
-        if hallucination_report.hallucination_probability > self.HALLUCINATION_AUTO_REMOVE_THRESHOLD:
+        if hallucination_report.hallucination_probability > self.profile.hallucination_auto_remove_threshold:
             # High hallucination probability - remove flagged propositions
             verified_answer = self._remove_flagged_propositions(
                 baseline.answer,
@@ -733,6 +740,7 @@ ANSWER:"""
         # Build metadata
         verification_metadata = VerificationMetadata(
             status=status,
+            active_verification_level=self.profile.level.value,
             hallucination_probability=hallucination_report.hallucination_probability,
             propositions_checked=len(baseline.propositions),
             propositions_verified=len(baseline.propositions) - len(hallucination_report.flagged_proposition_indices),
@@ -899,6 +907,7 @@ ANSWER:"""
             verified_confidence=baseline.confidence,
             verification_metadata=VerificationMetadata(
                 status="failed",
+                active_verification_level=self.profile.level.value,
                 hallucination_probability=0.0,
                 propositions_checked=0,
                 propositions_verified=0,
@@ -946,6 +955,7 @@ ANSWER:"""
             verified_confidence=0.0,
             verification_metadata=VerificationMetadata(
                 status="failed",
+                active_verification_level=self.profile.level.value,
                 hallucination_probability=0.0,
                 propositions_checked=0,
                 propositions_verified=0,

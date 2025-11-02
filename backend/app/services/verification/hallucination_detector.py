@@ -16,6 +16,7 @@ from app.schemas.verification import (
 )
 from app.schemas.answer import Proposition
 from app.utils.text_matching import normalize_text, calculate_word_overlap
+from app.core.verification_profiles import get_active_profile, VerificationProfile
 
 logger = logging.getLogger(__name__)
 
@@ -25,31 +26,37 @@ class HallucinationDetector:
     Detect hallucinations in generated answers.
 
     Uses three-factor scoring:
-    1. Quote coverage: Does proposition have supporting quote? (weight: 0.5)
-    2. Verification agreement: Do independent answers match? (weight: 0.3)
-    3. Semantic contradiction: Do answers contradict? (weight: 0.2)
+    1. Quote coverage: Does proposition have supporting quote? (weight: from profile)
+    2. Verification agreement: Do independent answers match? (weight: from profile)
+    3. Semantic contradiction: Do answers contradict? (weight: from profile)
 
     Based on technical documentation Section 2 (hallucination detection algorithm).
     """
 
-    def __init__(self, ollama_client=None):
+    def __init__(self, ollama_client=None, profile: VerificationProfile = None):
         """
         Initialize hallucination detector.
 
         Args:
             ollama_client: Optional OllamaClient for LLM-based contradiction detection.
                           If None, uses heuristic-based detection only.
+            profile: VerificationProfile to use (loads from settings if not provided)
         """
         self.ollama_client = ollama_client
 
-        # Scoring weights
-        self.quote_coverage_weight = 0.5
-        self.verification_agreement_weight = 0.3
-        self.semantic_contradiction_weight = 0.2
+        # Load profile
+        self.profile = profile or get_active_profile()
+
+        # Scoring weights from profile
+        self.quote_coverage_weight = self.profile.hallucination_quote_coverage_weight
+        self.verification_agreement_weight = self.profile.hallucination_verification_agreement_weight
+        self.semantic_contradiction_weight = self.profile.hallucination_semantic_contradiction_weight
 
         logger.info(
-            "HallucinationDetector initialized "
-            f"(LLM-based contradiction: {ollama_client is not None})"
+            "HallucinationDetector initialized",
+            verification_level=self.profile.level.value,
+            llm_contradiction=ollama_client is not None and self.profile.enable_contradiction_check,
+            quote_weight=self.quote_coverage_weight
         )
 
     async def detect_hallucinations(
@@ -125,8 +132,8 @@ class HallucinationDetector:
                     extra={"score": verification_agreement_score}
                 )
 
-            # Factor 3: Semantic contradiction (weight: 0.2)
-            if self.ollama_client:
+            # Factor 3: Semantic contradiction (weight: 0.2) - only if enabled in profile
+            if self.ollama_client and self.profile.enable_contradiction_check:
                 contradiction_score, contradiction_detail = await self._check_contradiction(
                     prop,
                     verification_answers

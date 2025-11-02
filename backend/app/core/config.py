@@ -192,6 +192,15 @@ class Settings(BaseSettings):
     # Chain-of-Verification Configuration (Step 11.2)
     # ========================================
 
+    # Verification Level (Controls all verification parameters)
+    # Options: VERY_HIGH, HIGH, MEDIUM, LOW, VERY_LOW
+    # - VERY_HIGH: Maximum strictness for legal/medical (>98% accuracy)
+    # - HIGH: Production default (>95% accuracy) - RECOMMENDED
+    # - MEDIUM: Balanced for internal tools (>90% accuracy)
+    # - LOW: Lenient for exploratory queries (>85% accuracy)
+    # - VERY_LOW: Minimal verification, speed-focused (>80% accuracy)
+    VERIFICATION_LEVEL: str = "HIGH"
+
     # Verification Feature Flags
     VERIFICATION_ENABLED: bool = True  # Global enable/disable
     VERIFICATION_DEFAULT_ON: bool = False  # Default for API requests (opt-in)

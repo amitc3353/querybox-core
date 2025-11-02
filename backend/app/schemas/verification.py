@@ -200,6 +200,10 @@ class VerificationMetadata(BaseModel):
         ...,
         description="Verification status"
     )
+    active_verification_level: Optional[str] = Field(
+        None,
+        description="Active verification level (VERY_HIGH, HIGH, MEDIUM, LOW, VERY_LOW)"
+    )
     hallucination_probability: Optional[float] = Field(
         None,
         ge=0.0,
@@ -250,6 +254,7 @@ class VerificationMetadata(BaseModel):
         json_schema_extra = {
             "example": {
                 "status": "verified",
+                "active_verification_level": "HIGH",
                 "hallucination_probability": 0.1,
                 "propositions_checked": 2,
                 "propositions_verified": 2,

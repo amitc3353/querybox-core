@@ -14,6 +14,7 @@ import logging
 from app.schemas.verification import QuoteMatch, Passage
 from app.utils.text_matching import extract_sentences, normalize_text
 from app.core.config import settings
+from app.core.verification_profiles import get_active_profile, VerificationProfile
 
 logger = logging.getLogger(__name__)
 
@@ -30,21 +31,26 @@ class QuoteMatchingService:
     - Time: 50-100ms per proposition
     """
 
-    def __init__(self, similarity_threshold: float = None):
+    def __init__(self, similarity_threshold: float = None, profile: VerificationProfile = None):
         """
         Initialize quote matching service.
 
         Args:
             similarity_threshold: Minimum similarity score (0-1) for matches.
-                                 Defaults to settings.QUOTE_SIMILARITY_THRESHOLD (0.85)
+                                 If not provided, uses active profile threshold.
+            profile: VerificationProfile to use (loads from settings if not provided)
         """
-        self.similarity_threshold = similarity_threshold or getattr(
-            settings, 'QUOTE_SIMILARITY_THRESHOLD', 0.85
-        )
+        # Load profile if not provided
+        self.profile = profile or get_active_profile()
+
+        # Use explicit threshold or profile threshold
+        self.similarity_threshold = similarity_threshold or self.profile.quote_similarity_threshold
+
         self.tokenizer = tiktoken.get_encoding("cl100k_base")
 
         logger.info(
-            f"QuoteMatchingService initialized with threshold={self.similarity_threshold}"
+            f"QuoteMatchingService initialized with threshold={self.similarity_threshold} "
+            f"(verification_level={self.profile.level.value})"
         )
 
     def find_supporting_quotes(
@@ -86,7 +92,7 @@ class QuoteMatchingService:
             >>> matches[0].similarity_score >= 0.85
             True
         """
-        top_k = top_k or getattr(settings, 'QUOTE_MAX_MATCHES_PER_PROPOSITION', 5)
+        top_k = top_k or self.profile.quote_max_matches_per_proposition
 
         logger.debug(
             f"Starting quote matching for proposition: {proposition[:50]}...",
