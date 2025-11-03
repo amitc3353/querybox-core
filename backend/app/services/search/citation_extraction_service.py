@@ -10,6 +10,7 @@ Implements 4-stage citation extraction pipeline:
 from typing import List, Optional, Dict
 import structlog
 import json
+import html
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 
@@ -74,10 +75,16 @@ class CitationExtractionService:
                 disable_pipes = getattr(settings, 'SPACY_DISABLE_PIPES', ['ner', 'parser'])
                 self.nlp = spacy.load(model_name, disable=disable_pipes)
 
+                # Add sentencizer if parser is disabled (for fast sentence boundary detection)
+                if 'parser' in disable_pipes:
+                    self.nlp.add_pipe('sentencizer')
+                    logger.info("spacy_sentencizer_added", reason="parser_disabled")
+
                 logger.info(
                     "spacy_model_loaded",
                     model_name=model_name,
-                    disabled_pipes=disable_pipes
+                    disabled_pipes=disable_pipes,
+                    has_sentencizer='parser' in disable_pipes
                 )
             except Exception as e:
                 logger.error(
@@ -127,7 +134,7 @@ class CitationExtractionService:
             from app.schemas.search import SearchResultItemWithCitations
 
             # Stage 1: Fetch citation metadata (single batched query)
-            chunk_ids = [result.document_id for result in search_results if result.chunk_index is not None]
+            chunk_ids = [result.chunk_id for result in search_results if result.chunk_id is not None]
 
             if not chunk_ids:
                 logger.warning("citation_extraction_no_chunk_ids")
@@ -140,9 +147,8 @@ class CitationExtractionService:
             enriched_results = []
             for result in search_results:
                 try:
-                    # Get metadata for this result
-                    # Note: Using document_id as chunk_id for now (may need adjustment based on actual data model)
-                    metadata = metadata_map.get(str(result.document_id))
+                    # Get metadata for this result using chunk_id
+                    metadata = metadata_map.get(str(result.chunk_id)) if result.chunk_id else None
 
                     if not metadata:
                         # No metadata available - include result without citations
@@ -415,13 +421,19 @@ class CitationExtractionService:
             # Convert to Citation objects with source context
             citations = []
             for sent in top_sentences:
+                # Decode HTML entities and truncate to 500 chars (Citation schema max_length)
+                citation_text = html.unescape(sent["text"])
+                if len(citation_text) > 500:
+                    citation_text = citation_text[:497] + '...'
+
                 source_context = self._build_source_context(
                     page=chunk_metadata.get("page_number"),
-                    section=chunk_metadata.get("section_heading")
+                    section=chunk_metadata.get("section_heading"),
+                    document_name=chunk_metadata.get("document_name")
                 )
 
                 citations.append(Citation(
-                    text=sent["text"],
+                    text=citation_text,
                     page=chunk_metadata.get("page_number"),
                     section=chunk_metadata.get("section_heading"),
                     position=sent["position"],
@@ -467,11 +479,16 @@ class CitationExtractionService:
             if len(sent.split()) < 10:  # Skip very short
                 continue
 
+            # Decode HTML entities and truncate to 500 chars (Citation schema max_length)
+            citation_text = html.unescape(sent.strip() + ('.' if not sent.endswith('.') else ''))
+            if len(citation_text) > 500:
+                citation_text = citation_text[:497] + '...'
+
             position_start = chunk_metadata.get("start_position", 0) + chunk_text.find(sent)
             position_end = position_start + len(sent)
 
             citations.append(Citation(
-                text=sent.strip() + ('.' if not sent.endswith('.') else ''),
+                text=citation_text,
                 page=chunk_metadata.get("page_number"),
                 section=chunk_metadata.get("section_heading"),
                 position=CitationPosition(
@@ -481,7 +498,8 @@ class CitationExtractionService:
                 confidence=0.5,  # Neutral confidence for fallback
                 source_context=self._build_source_context(
                     page=chunk_metadata.get("page_number"),
-                    section=chunk_metadata.get("section_heading")
+                    section=chunk_metadata.get("section_heading"),
+                    document_name=chunk_metadata.get("document_name")
                 )
             ))
 
@@ -544,7 +562,8 @@ class CitationExtractionService:
     def _build_source_context(
         self,
         page: Optional[int],
-        section: Optional[str]
+        section: Optional[str],
+        document_name: Optional[str] = None
     ) -> str:
         """
         Build human-readable source context string
@@ -553,11 +572,13 @@ class CitationExtractionService:
             - "Page 12, Section 3.2 Performance Analysis"
             - "Page 5, Introduction"
             - "Section 2.1 Methodology" (if page unknown)
-            - "Unknown source" (if both unknown)
+            - "report.pdf" (if page and section unknown but document name available)
+            - "Unknown source" (if all unknown)
 
         Args:
             page: Page number
             section: Section heading
+            document_name: Document name (fallback)
 
         Returns:
             Formatted source context string
@@ -574,6 +595,10 @@ class CitationExtractionService:
 
         if parts:
             return ", ".join(parts)
+
+        # Fallback to document name if available
+        if document_name:
+            return document_name
 
         return "Unknown source"
 

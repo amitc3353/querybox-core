@@ -223,9 +223,10 @@ class VectorSearchService:
             Total count of matching chunks
         """
         # Build count query with proper joins
+        # Use LEFT JOIN for DocumentText to include embeddings even when DocumentText is missing
         query = self.db.query(func.count(Embedding.id)).join(
             Document, Embedding.document_id == Document.id
-        ).join(
+        ).outerjoin(
             DocumentText, Embedding.document_id == DocumentText.document_id
         ).filter(
             # Only chunks with embeddings
@@ -237,7 +238,7 @@ class VectorSearchService:
         )
 
         # Apply similarity threshold if specified
-        if similarity_threshold > 0.0:
+        if similarity_threshold is not None and similarity_threshold > 0.0:
             # 1 - cosine_distance = similarity score
             similarity_expr = 1 - Embedding.embedding.cosine_distance(query_vector)
             query = query.filter(similarity_expr > similarity_threshold)
@@ -276,6 +277,7 @@ class VectorSearchService:
         similarity_expr = (1 - Embedding.embedding.cosine_distance(query_vector)).label('similarity_score')
 
         # Build base query
+        # Use LEFT JOIN for DocumentText to include embeddings even when DocumentText is missing
         query = self.db.query(
             Embedding.id,
             Embedding.document_id,
@@ -285,6 +287,7 @@ class VectorSearchService:
             Embedding.chunk_type,
             Embedding.start_position,
             Embedding.end_position,
+            Embedding.embedding,  # Include embedding for MMR and semantic dedup
             Document.document_name,
             Document.mime_type,
             Document.created_at,
@@ -292,7 +295,7 @@ class VectorSearchService:
             similarity_expr
         ).join(
             Document, Embedding.document_id == Document.id
-        ).join(
+        ).outerjoin(
             DocumentText, Embedding.document_id == DocumentText.document_id
         ).filter(
             # Only chunks with embeddings
@@ -304,7 +307,7 @@ class VectorSearchService:
         )
 
         # Apply similarity threshold
-        if similarity_threshold > 0.0:
+        if similarity_threshold is not None and similarity_threshold > 0.0:
             query = query.filter(similarity_expr > similarity_threshold)
 
         # Apply metadata filters
@@ -322,8 +325,21 @@ class VectorSearchService:
         # Convert to dict
         chunk_results = []
         for row in results:
+            # Convert pgvector embedding to list of floats
+            embedding_list = None
+            if row.embedding is not None:
+                try:
+                    # pgvector returns the embedding as a list already
+                    embedding_list = list(row.embedding) if hasattr(row.embedding, '__iter__') else None
+                except Exception as e:
+                    logger.debug(
+                        "embedding_conversion_failed",
+                        chunk_id=str(row.id),
+                        error=str(e)
+                    )
+
             chunk_results.append({
-                'id': str(row.id),
+                'chunk_id': str(row.id),
                 'document_id': str(row.document_id),
                 'document_name': row.document_name,
                 'document_type': row.mime_type,
@@ -339,7 +355,8 @@ class VectorSearchService:
                 'chunk_position': {
                     'start': row.start_position,
                     'end': row.end_position
-                } if row.start_position is not None else None
+                } if row.start_position is not None else None,
+                'embedding': embedding_list  # For MMR and semantic dedup
             })
 
         return chunk_results
@@ -421,6 +438,7 @@ class VectorSearchService:
         for result in results:
             result_items.append(
                 SearchResultItem(
+                    chunk_id=result.get('chunk_id'),
                     document_id=result['document_id'],
                     document_name=result['document_name'],
                     relevance_score=result['relevance_score'],
@@ -429,7 +447,8 @@ class VectorSearchService:
                     chunk_position=result['chunk_position'],
                     extraction_quality=result['extraction_quality'],
                     document_type=result['document_type'],
-                    created_at=result['created_at']
+                    created_at=result['created_at'],
+                    embedding=result.get('embedding')  # For MMR and semantic dedup
                 )
             )
         return result_items

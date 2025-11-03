@@ -254,32 +254,11 @@ class StorageManager:
             
             # Calculate checksum
             checksum = await self._calculate_checksum(content)
-            
-            # Check for duplicate files by checksum
-            existing_doc = self.db.query(Document).filter_by(checksum=checksum).first()
-            if existing_doc:
-                # File already exists, return existing info
-                operation_time_ms = (time.time() - start_time) * 1000
-                
-                await self._log_operation(
-                    "duplicate_detected",
-                    existing_doc.storage_path,
-                    True,
-                    operation_time_ms,
-                    workspace_id,
-                    existing_doc.id
-                )
-                
-                return StorageResult(
-                    document_id=existing_doc.id,
-                    path=existing_doc.storage_path,
-                    size=existing_doc.file_size,
-                    checksum=existing_doc.checksum,
-                    mime_type=existing_doc.mime_type,
-                    provider=StorageProviderType(existing_doc.storage_provider.value),
-                    operation_time_ms=operation_time_ms
-                )
-            
+
+            # Note: Duplicate detection moved to upload endpoint layer
+            # StorageManager now focuses solely on storage operations
+            # This simplifies the architecture and avoids UUID conflicts
+
             # Generate initial path
             initial_path = self.path_generator.generate_document_path(
                 workspace_id=workspace_id,

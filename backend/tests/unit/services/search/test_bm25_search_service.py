@@ -255,6 +255,7 @@ class TestBM25SearchService:
         """Test fetching candidates returns list of dicts"""
         mock_query = Mock()
         mock_query.join.return_value = mock_query
+        mock_query.outerjoin.return_value = mock_query
         mock_query.filter.return_value = mock_query
         mock_query.limit.return_value = mock_query
         mock_query.all.return_value = []
@@ -268,6 +269,7 @@ class TestBM25SearchService:
         """Test candidate chunks builds correct tsquery"""
         mock_query = Mock()
         mock_query.join.return_value = mock_query
+        mock_query.outerjoin.return_value = mock_query
         mock_query.filter.return_value = mock_query
         mock_query.limit.return_value = mock_query
         mock_query.all.return_value = sample_chunks
@@ -285,6 +287,7 @@ class TestBM25SearchService:
         """Test candidate chunks escapes single quotes in terms"""
         mock_query = Mock()
         mock_query.join.return_value = mock_query
+        mock_query.outerjoin.return_value = mock_query
         mock_query.filter.return_value = mock_query
         mock_query.limit.return_value = mock_query
         mock_query.all.return_value = []
@@ -438,6 +441,7 @@ class TestBM25SearchService:
         # Mock candidate chunks query
         mock_query = Mock()
         mock_query.join.return_value = mock_query
+        mock_query.outerjoin.return_value = mock_query
         mock_query.filter.return_value = mock_query
         mock_query.limit.return_value = mock_query
         mock_query.all.return_value = sample_chunks
@@ -470,6 +474,7 @@ class TestBM25SearchService:
 
         mock_query = Mock()
         mock_query.join.return_value = mock_query
+        mock_query.outerjoin.return_value = mock_query
         mock_query.filter.return_value = mock_query
         mock_query.limit.return_value = mock_query
         mock_query.all.return_value = []
@@ -484,6 +489,7 @@ class TestBM25SearchService:
 
         mock_query = Mock()
         mock_query.join.return_value = mock_query
+        mock_query.outerjoin.return_value = mock_query
         mock_query.filter.return_value = mock_query
         mock_query.limit.return_value = mock_query
         mock_query.all.return_value = sample_chunks
@@ -502,6 +508,7 @@ class TestBM25SearchService:
         # Return 3 chunks
         mock_query = Mock()
         mock_query.join.return_value = mock_query
+        mock_query.outerjoin.return_value = mock_query
         mock_query.filter.return_value = mock_query
         mock_query.limit.return_value = mock_query
         mock_query.all.return_value = sample_chunks
@@ -524,6 +531,7 @@ class TestBM25SearchService:
 
         mock_query = Mock()
         mock_query.join.return_value = mock_query
+        mock_query.outerjoin.return_value = mock_query
         mock_query.filter.return_value = mock_query
         mock_query.limit.return_value = mock_query
         mock_query.all.return_value = sample_chunks
@@ -597,6 +605,61 @@ class TestBM25SearchService:
     def test_init_corpus_cache_empty(self, service):
         """Test initialization sets empty corpus cache"""
         assert service._corpus_stats_cache is None
+
+    def test_decimal_to_float_conversion_in_corpus_stats(self, service, mock_db):
+        """Test Decimal values from database are converted to float"""
+        from decimal import Decimal
+
+        # Mock database query to return Decimal (as PostgreSQL does)
+        mock_query = Mock()
+        mock_query.filter.return_value = mock_query
+        mock_query.first.return_value = Mock(
+            total_chunks=1000,
+            avg_chunk_length=Decimal('5000.50')  # Decimal from database
+        )
+        mock_db.query.return_value = mock_query
+
+        stats = service._get_corpus_stats()
+
+        # Should convert Decimal to float
+        assert isinstance(stats['avg_chunk_length'], float)
+        assert stats['avg_chunk_length'] == 1000.1  # 5000.50 / 5.0
+        # Verify it's not a Decimal
+        assert not isinstance(stats['avg_chunk_length'], Decimal)
+
+    def test_left_join_for_document_text(self, service, mock_db):
+        """Test query uses LEFT JOIN (outerjoin) for DocumentText table"""
+        # Mock query chain
+        mock_query = Mock()
+        mock_query.join.return_value = mock_query
+        mock_query.outerjoin.return_value = mock_query  # LEFT JOIN
+        mock_query.filter.return_value = mock_query
+        mock_query.limit.return_value = mock_query
+        mock_query.all.return_value = []
+        mock_db.query.return_value = mock_query
+
+        # Execute fetch candidates
+        service._fetch_candidate_chunks(["test"], None, 100)
+
+        # Verify outerjoin was called (for LEFT JOIN with DocumentText)
+        mock_query.outerjoin.assert_called()
+
+    def test_avg_chunk_length_character_to_word_conversion(self, service, mock_db):
+        """Test average chunk length is correctly converted from characters to words"""
+        # Mock database query
+        mock_query = Mock()
+        mock_query.filter.return_value = mock_query
+        mock_query.first.return_value = Mock(
+            total_chunks=500,
+            avg_chunk_length=2500  # 2500 characters
+        )
+        mock_db.query.return_value = mock_query
+
+        stats = service._get_corpus_stats()
+
+        # Should divide by 5.0 to convert chars to words
+        assert stats['avg_chunk_length'] == 500.0  # 2500 / 5.0 = 500 words
+        assert stats['total_chunks'] == 500
 
 
 class TestGetBM25SearchService:

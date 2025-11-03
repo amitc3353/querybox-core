@@ -203,6 +203,7 @@ class TestVectorSearchService:
         # Mock the count query
         mock_query = Mock()
         mock_query.join.return_value = mock_query
+        mock_query.outerjoin.return_value = mock_query
         mock_query.filter.return_value = mock_query
         mock_query.scalar.return_value = 15
 
@@ -219,6 +220,7 @@ class TestVectorSearchService:
 
         mock_query = Mock()
         mock_query.join.return_value = mock_query
+        mock_query.outerjoin.return_value = mock_query
         mock_query.filter.return_value = mock_query
         mock_query.scalar.return_value = None
 
@@ -234,6 +236,7 @@ class TestVectorSearchService:
 
         mock_query = Mock()
         mock_query.join.return_value = mock_query
+        mock_query.outerjoin.return_value = mock_query
         mock_query.filter.return_value = mock_query
         mock_query.scalar.return_value = 5
 
@@ -280,12 +283,14 @@ class TestVectorSearchService:
         # Mock count query
         count_query = Mock()
         count_query.join.return_value = count_query
+        count_query.outerjoin.return_value = count_query
         count_query.filter.return_value = count_query
         count_query.scalar.return_value = 10
 
         # Mock search query
         search_query = Mock()
         search_query.join.return_value = search_query
+        search_query.outerjoin.return_value = search_query
         search_query.filter.return_value = search_query
         search_query.order_by.return_value = search_query
         search_query.limit.return_value = search_query
@@ -322,12 +327,14 @@ class TestVectorSearchService:
         # Mock count query
         count_query = Mock()
         count_query.join.return_value = count_query
+        count_query.outerjoin.return_value = count_query
         count_query.filter.return_value = count_query
         count_query.scalar.return_value = 2
 
         # Mock search query
         search_query = Mock()
         search_query.join.return_value = search_query
+        search_query.outerjoin.return_value = search_query
         search_query.filter.return_value = search_query
         search_query.order_by.return_value = search_query
         search_query.limit.return_value = search_query
@@ -357,11 +364,13 @@ class TestVectorSearchService:
         # Mock queries
         count_query = Mock()
         count_query.join.return_value = count_query
+        count_query.outerjoin.return_value = count_query
         count_query.filter.return_value = count_query
         count_query.scalar.return_value = 3
 
         search_query = Mock()
         search_query.join.return_value = search_query
+        search_query.outerjoin.return_value = search_query
         search_query.filter.return_value = search_query
         search_query.order_by.return_value = search_query
         search_query.limit.return_value = search_query
@@ -384,11 +393,13 @@ class TestVectorSearchService:
         # Mock queries returning no results
         count_query = Mock()
         count_query.join.return_value = count_query
+        count_query.outerjoin.return_value = count_query
         count_query.filter.return_value = count_query
         count_query.scalar.return_value = 0
 
         search_query = Mock()
         search_query.join.return_value = search_query
+        search_query.outerjoin.return_value = search_query
         search_query.filter.return_value = search_query
         search_query.order_by.return_value = search_query
         search_query.limit.return_value = search_query
@@ -431,11 +442,13 @@ class TestVectorSearchService:
         # Mock queries
         count_query = Mock()
         count_query.join.return_value = count_query
+        count_query.outerjoin.return_value = count_query
         count_query.filter.return_value = count_query
         count_query.scalar.return_value = 20
 
         search_query = Mock()
         search_query.join.return_value = search_query
+        search_query.outerjoin.return_value = search_query
         search_query.filter.return_value = search_query
         search_query.order_by.return_value = search_query
         search_query.limit.return_value = search_query
@@ -457,6 +470,7 @@ class TestVectorSearchService:
         # Mock the query chain
         mock_query = Mock()
         mock_query.join.return_value = mock_query
+        mock_query.outerjoin.return_value = mock_query
         mock_query.filter.return_value = mock_query
         mock_query.order_by.return_value = mock_query
         mock_query.limit.return_value = mock_query
@@ -479,6 +493,99 @@ class TestVectorSearchService:
         assert results[0]["chunk_index"] == 0
         assert "similarity_score" in results[0]
         assert "relevance_score" in results[0]
+
+    def test_similarity_threshold_none_handling(self, service, mock_db, sample_vector_results):
+        """Test similarity_threshold=None is handled correctly (no filter applied)"""
+        query_vector = [0.1] * 1024
+
+        # Mock query chain (including outerjoin used for DocumentText)
+        mock_query = Mock()
+        mock_query.join.return_value = mock_query
+        mock_query.outerjoin.return_value = mock_query  # Added for LEFT JOIN
+        mock_query.filter.return_value = mock_query
+        mock_query.order_by.return_value = mock_query
+        mock_query.limit.return_value = mock_query
+        mock_query.offset.return_value = mock_query
+        mock_query.all.return_value = sample_vector_results
+
+        mock_db.query.return_value = mock_query
+
+        # Call with similarity_threshold=None
+        results = service._vector_search_chunks(query_vector, None, 10, 0, None)
+
+        # Should not crash and should return results
+        assert len(results) == 3
+
+        # Filter should only be called for base filters, not similarity threshold
+        # (Exact call count may vary based on implementation)
+        assert mock_query.filter.called
+
+    def test_similarity_threshold_zero_handling(self, service, mock_db, sample_vector_results):
+        """Test similarity_threshold=0.0 is handled correctly (no filter applied)"""
+        query_vector = [0.1] * 1024
+
+        # Mock query chain (including outerjoin used for DocumentText)
+        mock_query = Mock()
+        mock_query.join.return_value = mock_query
+        mock_query.outerjoin.return_value = mock_query  # Added for LEFT JOIN
+        mock_query.filter.return_value = mock_query
+        mock_query.order_by.return_value = mock_query
+        mock_query.limit.return_value = mock_query
+        mock_query.offset.return_value = mock_query
+        mock_query.all.return_value = sample_vector_results
+
+        mock_db.query.return_value = mock_query
+
+        # Call with similarity_threshold=0.0 (should not apply threshold filter)
+        results = service._vector_search_chunks(query_vector, None, 10, 0, 0.0)
+
+        # Should not crash and should return all results
+        assert len(results) == 3
+
+    def test_chunk_id_included_in_results(self, service, mock_db):
+        """Test that chunk_id (UUID) is included in search results"""
+        query_vector = [0.1] * 1024
+
+        # Create sample result with chunk_id
+        chunk_id = uuid4()
+        sample_result = Mock(
+            id=chunk_id,  # This should become chunk_id in results
+            document_id=uuid4(),
+            document_name="test.pdf",
+            mime_type="application/pdf",
+            created_at=datetime.now(timezone.utc),
+            extraction_quality=0.95,
+            chunk_index=0,
+            chunk_text="Sample text for testing",
+            section_heading="Introduction",
+            chunk_type="text",
+            start_position=0,
+            end_position=100,
+            similarity_score=0.85,
+        )
+
+        # Mock query chain (including outerjoin used for DocumentText)
+        mock_query = Mock()
+        mock_query.join.return_value = mock_query
+        mock_query.outerjoin.return_value = mock_query  # Added for LEFT JOIN
+        mock_query.filter.return_value = mock_query
+        mock_query.order_by.return_value = mock_query
+        mock_query.limit.return_value = mock_query
+        mock_query.offset.return_value = mock_query
+        mock_query.all.return_value = [sample_result]
+
+        mock_db.query.return_value = mock_query
+
+        # Execute search
+        results = service._vector_search_chunks(query_vector, None, 10, 0, 0.0)
+
+        # Verify chunk_id is in results
+        assert len(results) == 1
+        assert "chunk_id" in results[0]
+        assert results[0]["chunk_id"] == str(chunk_id)
+        # Ensure chunk_id is a string UUID, not integer
+        from uuid import UUID
+        UUID(results[0]["chunk_id"])  # Should not raise ValueError
 
 
 class TestGetVectorSearchService:

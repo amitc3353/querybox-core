@@ -2,7 +2,7 @@
 Upload endpoint - Week 1, Day 2 + Day 3, Step 5
 Enhanced file upload with StorageManager integration
 """
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
@@ -17,6 +17,7 @@ from app.core.config import settings
 from app.core.storage_config import storage_settings
 from app.db.database import get_db
 from app.models.document import Document, DocumentStatusEnum, StorageProviderEnum
+from app.models.processing_status import ProcessingStatus, ProcessingStageEnum, StageStatusEnum
 from app.services.storage import StorageManager
 from app.services.storage.exceptions import StorageException, StorageQuotaExceeded
 from app.schemas.storage import StorageResult
@@ -31,23 +32,94 @@ def get_storage_manager(db: Session = Depends(get_db)) -> StorageManager:
     return StorageManager(db)
 
 
+def _get_processing_summary(db: Session, document_id: UUID) -> dict:
+    """
+    Get processing status summary for a document
+
+    Returns status for all stages and determines:
+    - ready_for_search: All stages completed successfully
+    - can_retry: Any stage failed (user can re-upload with force_new=true)
+    - next_action: Guidance on what to do next
+    """
+    # Get all processing status records
+    statuses = db.query(ProcessingStatus).filter(
+        ProcessingStatus.document_id == document_id
+    ).all()
+
+    # Build status map
+    status_map = {
+        'extraction': 'not_started',
+        'chunking': 'not_started',
+        'embedding': 'not_started'
+    }
+
+    for status in statuses:
+        status_map[status.stage.value] = status.status.value
+
+    # Determine ready_for_search
+    ready_for_search = all(
+        status_map[stage] == 'completed'
+        for stage in ['extraction', 'chunking', 'embedding']
+    )
+
+    # Determine can_retry
+    has_failures = any(
+        status_map[stage] == 'failed'
+        for stage in ['extraction', 'chunking', 'embedding']
+    )
+
+    # Determine next action
+    next_action = None
+    if ready_for_search:
+        next_action = "ready_for_search"
+    elif has_failures:
+        # Find first failed stage
+        for stage in ['extraction', 'chunking', 'embedding']:
+            if status_map[stage] == 'failed':
+                next_action = f"retry_{stage}"
+                break
+    elif status_map['extraction'] == 'completed' and status_map['chunking'] == 'completed':
+        next_action = "wait_for_embedding"
+    elif status_map['extraction'] == 'completed':
+        next_action = "wait_for_chunking"
+    else:
+        next_action = "wait_for_extraction"
+
+    return {
+        'extraction_status': status_map['extraction'],
+        'chunking_status': status_map['chunking'],
+        'embedding_status': status_map['embedding'],
+        'ready_for_search': ready_for_search,
+        'can_retry': has_failures,
+        'next_action': next_action
+    }
+
+
 @router.post("/")
 async def upload_document(
     file: UploadFile = File(...),
     workspace_id: Optional[str] = None,  # For future multi-tenant support
+    force_new: bool = Query(
+        default=False,
+        description="Bypass content-based deduplication (useful for testing). Creates a new document even if identical content exists."
+    ),
     db: Session = Depends(get_db),
     storage: StorageManager = Depends(get_storage_manager)
 ):
     """
     Upload a single document with enhanced storage management
     Day 3, Step 5: StorageManager integration with atomic operations
-    
+
     Features:
     - Advanced file validation (size, extension, MIME type)
+    - Content-based deduplication (unless force_new=true)
     - Organized storage with conflict resolution
     - Atomic operations with rollback on failure
     - Comprehensive error handling and logging
     - Database integration with audit trail
+
+    Query Parameters:
+    - force_new: Set to true to bypass deduplication for testing
     """
     document_id = uuid4()
     temp_storage_result = None
@@ -111,49 +183,71 @@ async def upload_document(
         # Step 5: Create database record with deduplication
         # Note: Transaction is already started by FastAPI's Depends(get_db)
         try:
-            # Check if document with same checksum already exists (deduplication)
-            existing_doc = db.query(Document).filter(
-                Document.checksum == temp_storage_result.checksum,
-                Document.is_deleted == False
-            ).first()
+            # Check for duplicate by content checksum (content-based deduplication)
+            # Skip if force_new=true (for testing purposes)
+            existing_doc = None
+            if not force_new:
+                existing_doc = db.query(Document).filter(
+                    Document.checksum == temp_storage_result.checksum,
+                    Document.is_deleted == False
+                ).first()
 
             if existing_doc:
-                # Document already exists - clean up the newly uploaded file
-                try:
-                    await storage.provider.delete_file(temp_storage_result.path)
-                    logger.info(f"Duplicate detected, cleaned up new upload: {temp_storage_result.path}")
-                except Exception as cleanup_error:
-                    logger.warning(f"Failed to cleanup duplicate file: {cleanup_error}")
+                # Verify the existing document's file actually exists
+                existing_file_path = Path(storage_settings.LOCAL_STORAGE_ROOT) / existing_doc.storage_path
 
-                # Return existing document
-                logger.info(
-                    f"Duplicate document detected by checksum: {existing_doc.id}",
-                    extra={
-                        "document_id": str(existing_doc.id),
-                        "original_filename": file.filename,
-                        "existing_filename": existing_doc.original_name,
-                        "checksum": temp_storage_result.checksum
-                    }
-                )
+                if not existing_file_path.exists():
+                    # Stale record: DB entry exists but file is missing
+                    # Clean up and proceed with new upload
+                    logger.warning(
+                        f"Stale record detected: Document {existing_doc.id} exists in DB but file missing at {existing_doc.storage_path}. "
+                        f"Deleting stale record and using new upload."
+                    )
+                    db.delete(existing_doc)
+                    db.commit()
+                    # Fall through to create new document
+                else:
+                    # True duplicate: Same content exists with valid file
+                    # Clean up newly uploaded file and return existing document
+                    try:
+                        await storage.provider.delete_file(temp_storage_result.path)
+                        logger.info(f"Content-based duplicate detected. Cleaned up new upload: {temp_storage_result.path}")
+                    except Exception as cleanup_error:
+                        logger.warning(f"Failed to cleanup duplicate file: {cleanup_error}")
 
-                return JSONResponse(
-                    status_code=200,
-                    content={
-                        "success": True,
-                        "message": "File already exists (duplicate detected by content hash)",
-                        "duplicate": True,
-                        "document": {
-                            "id": str(existing_doc.id),
-                            "filename": existing_doc.original_name,
-                            "storage_filename": existing_doc.document_name,
-                            "size": existing_doc.file_size,
-                            "mime_type": existing_doc.mime_type,
-                            "checksum": existing_doc.checksum,
-                            "status": existing_doc.status.value,
-                            "created_at": existing_doc.created_at.isoformat()
+                    # Get processing status for duplicate document
+                    processing_summary = _get_processing_summary(db, existing_doc.id)
+
+                    logger.info(
+                        f"Duplicate document detected by content hash: {existing_doc.id}",
+                        extra={
+                            "document_id": str(existing_doc.id),
+                            "original_filename": file.filename,
+                            "existing_filename": existing_doc.original_name,
+                            "checksum": temp_storage_result.checksum,
+                            "processing_status": processing_summary
                         }
-                    }
-                )
+                    )
+
+                    return JSONResponse(
+                        status_code=200,
+                        content={
+                            "success": True,
+                            "message": "File already exists (duplicate detected by content hash)",
+                            "duplicate": True,
+                            "document": {
+                                "id": str(existing_doc.id),
+                                "filename": existing_doc.original_name,
+                                "storage_filename": existing_doc.document_name,
+                                "size": existing_doc.file_size,
+                                "mime_type": existing_doc.mime_type,
+                                "checksum": existing_doc.checksum,
+                                "status": existing_doc.status.value,
+                                "created_at": existing_doc.created_at.isoformat()
+                            },
+                            "processing_status": processing_summary
+                        }
+                    )
 
             # No duplicate found - create new document
             doc = Document(
@@ -191,7 +285,17 @@ async def upload_document(
             )
 
             # Trigger text extraction for supported formats
-            if detected_mime in ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]:
+            # PDF, DOCX, and text-based formats (markdown, text, HTML)
+            extractable_mimes = [
+                "application/pdf",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "text/markdown",
+                "text/plain",
+                "text/html",
+                "application/octet-stream"  # Fallback for markdown files
+            ]
+
+            if detected_mime in extractable_mimes:
                 try:
                     # Queue async text extraction task
                     task = extract_document_text.delay(str(doc.id))

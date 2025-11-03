@@ -133,6 +133,21 @@ class DocumentTextExtractor:
             if not Path(file_path).exists():
                 raise FileNotFoundError(f"Document file not found: {file_path}")
 
+            # Handle text-based files directly (markdown, txt, etc.)
+            file_extension = Path(file_path).suffix.lower()
+            text_extensions = ['.md', '.txt', '.markdown', '.rst', '.text']
+            text_mime_types = ['text/markdown', 'text/plain', 'text/x-markdown', 'application/octet-stream']
+
+            if file_extension in text_extensions or mime_type in text_mime_types:
+                # For text files, check extension takes precedence
+                if file_extension in text_extensions:
+                    logger.info(f"Using direct text extraction for {file_extension} file: {document_id}")
+                    return await self._extract_text_file(file_path, document_id, start_time)
+                # If MIME is text-based but extension is unknown, still try direct read
+                elif mime_type in ['text/markdown', 'text/plain', 'text/x-markdown']:
+                    logger.info(f"Using direct text extraction for {mime_type} file: {document_id}")
+                    return await self._extract_text_file(file_path, document_id, start_time)
+
             if not self.converter:
                 self._initialize_converter()
 
@@ -279,6 +294,82 @@ class DocumentTextExtractor:
             return "en"
 
         return "en"  # Default to English
+
+    async def _extract_text_file(
+        self,
+        file_path: str,
+        document_id: UUID,
+        start_time: datetime
+    ) -> TextExtractionResult:
+        """
+        Direct text extraction for text-based files (markdown, txt, etc.)
+
+        Args:
+            file_path: Path to text file
+            document_id: Document UUID for tracking
+            start_time: Extraction start time
+
+        Returns:
+            TextExtractionResult with extraction details
+        """
+        try:
+            logger.info(f"Starting direct text extraction for document {document_id}")
+
+            # Read file with common encodings
+            full_text = ""
+            encoding_attempts = ['utf-8', 'utf-8-sig', 'latin-1', 'cp1252']
+
+            for encoding in encoding_attempts:
+                try:
+                    with open(file_path, 'r', encoding=encoding) as f:
+                        full_text = f.read()
+                    logger.info(f"Successfully read file with {encoding} encoding")
+                    break
+                except UnicodeDecodeError:
+                    if encoding == encoding_attempts[-1]:
+                        # Last attempt failed
+                        raise
+                    continue
+
+            # Calculate metrics
+            text_length = len(full_text)
+            total_pages = 1  # Text files are single-page
+            extraction_quality = self._assess_quality(full_text, 0, total_pages)
+            detected_language = self._detect_language(full_text)
+
+            # Calculate duration
+            end_time = datetime.now(timezone.utc)
+            extraction_duration_ms = int((end_time - start_time).total_seconds() * 1000)
+
+            logger.info(
+                f"Direct text extraction completed for document {document_id}: "
+                f"{text_length} chars, {extraction_duration_ms}ms"
+            )
+
+            return TextExtractionResult(
+                success=True,
+                full_text=full_text,
+                text_length=text_length,
+                extraction_method="direct",
+                extraction_engine="python_io",
+                extraction_quality=extraction_quality,
+                pages_with_ocr=0,
+                total_pages=total_pages,
+                extraction_duration_ms=extraction_duration_ms,
+                detected_language=detected_language,
+            )
+
+        except Exception as e:
+            end_time = datetime.now(timezone.utc)
+            extraction_duration_ms = int((end_time - start_time).total_seconds() * 1000)
+
+            logger.error(f"Direct text extraction failed for document {document_id}: {e}", exc_info=True)
+
+            return TextExtractionResult(
+                success=False,
+                extraction_duration_ms=extraction_duration_ms,
+                error_message=f"Direct text extraction failed: {str(e)}",
+            )
 
     async def _extract_with_pypdf2(
         self,

@@ -327,6 +327,352 @@ async def semantic_search(
         )
 
 
+@router.post("/keyword", response_model=SearchResponse, status_code=status.HTTP_200_OK)
+async def keyword_search(
+    query: SearchQuery,
+    db: Session = Depends(get_db)
+):
+    """
+    Dedicated keyword search endpoint for better API consistency
+
+    **Note:** This endpoint provides the same functionality as POST /search/
+    but with a more explicit, RESTful naming convention.
+
+    **Search Strategy:**
+    - PostgreSQL full-text search with to_tsvector and to_tsquery
+    - Returns results ranked by relevance (ts_rank)
+    - Generates highlighted snippets (ts_headline)
+
+    **Example Request:**
+    ```json
+    {
+      "query": "machine learning",
+      "filters": {
+        "document_types": ["application/pdf"]
+      },
+      "limit": 10
+    }
+    ```
+
+    Args:
+        query: SearchQuery with query string, filters, limit, offset
+        db: Database session (injected)
+
+    Returns:
+        SearchResponse with keyword search results
+
+    Raises:
+        HTTPException 400: Invalid query or filters
+        HTTPException 500: Database or server error
+    """
+    try:
+        # Log search request
+        logger.info(
+            "keyword_search_request",
+            query=query.query,
+            filters=query.filters.dict() if query.filters else None,
+            limit=query.limit,
+            offset=query.offset
+        )
+
+        # Get search service
+        search_service = get_search_service(db)
+
+        # Execute search
+        response = search_service.search(
+            query=query.query,
+            filters=query.filters,
+            limit=query.limit,
+            offset=query.offset
+        )
+
+        # Log search results
+        logger.info(
+            "keyword_search_completed",
+            query=query.query,
+            total_results=response.total_results,
+            returned_results=response.returned_results,
+            processing_time_ms=response.processing_time_ms
+        )
+
+        return response
+
+    except ValueError as e:
+        logger.warning(
+            "keyword_search_validation_error",
+            query=query.query,
+            error=str(e)
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid search query: {str(e)}"
+        )
+
+    except SQLAlchemyError as e:
+        logger.error(
+            "keyword_search_database_error",
+            query=query.query,
+            error=str(e),
+            exc_info=True
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database error occurred during search. Please try again later."
+        )
+
+    except Exception as e:
+        logger.error(
+            "keyword_search_unexpected_error",
+            query=query.query,
+            error=str(e),
+            exc_info=True
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred during search. Please try again later."
+        )
+
+
+@router.post("/hybrid", response_model=SearchResponseWithCitations, status_code=status.HTTP_200_OK)
+async def hybrid_search(
+    query: UnifiedSearchQuery,
+    citations: bool = Query(
+        default=True,
+        description="Enable citation extraction and source tracking"
+    ),
+    citation_limit: int = Query(
+        default=3,
+        ge=1,
+        le=5,
+        description="Maximum citations per result (1-5, default: 3)"
+    ),
+    db: Session = Depends(get_db)
+):
+    """
+    Dedicated hybrid search endpoint combining BM25 + vector search with RRF fusion
+
+    **Search Strategy:**
+    - Combines keyword (BM25) and semantic (vector) search
+    - Merges results using Reciprocal Rank Fusion (RRF)
+    - Supports advanced reranking with cross-encoder + MMR + deduplication
+    - Provides best accuracy for production RAG applications
+
+    **Hybrid Search Parameters:**
+    - keyword_weight: Weight for keyword results (default: 0.5)
+    - vector_weight: Weight for vector results (default: 0.5)
+    - keyword_top_k: Candidates from keyword search (default: 100)
+    - vector_top_k: Candidates from vector search (default: 100)
+
+    **Advanced Reranking Parameters:**
+    - enable_reranking: Enable cross-encoder reranking (default: False)
+    - rerank_top_k: Candidates to keep after reranking (default: 50)
+    - enable_mmr: Enable MMR diversification (default: from settings)
+    - mmr_lambda: Diversity parameter, 0.0=max diversity, 1.0=max relevance (default: 0.7)
+    - enable_dedup: Enable advanced deduplication (default: from settings)
+
+    **Citation Parameters:**
+    - citations: Enable citation extraction (default: True)
+    - citation_limit: Max citations per result (default: 3, max: 5)
+
+    **Example Request:**
+    ```json
+    {
+      "query": "machine learning algorithms",
+      "filters": {
+        "document_types": ["application/pdf"]
+      },
+      "limit": 10,
+      "keyword_weight": 0.5,
+      "vector_weight": 0.5,
+      "enable_reranking": true,
+      "rerank_top_k": 50,
+      "enable_mmr": true,
+      "mmr_lambda": 0.7
+    }
+    ```
+
+    Args:
+        query: UnifiedSearchQuery with hybrid search parameters
+        citations: Enable citation extraction (default: True)
+        citation_limit: Maximum citations per result (1-5, default: 3)
+        db: Database session (injected)
+
+    Returns:
+        SearchResponseWithCitations with hybrid search results and citations
+
+    Raises:
+        HTTPException 400: Invalid query or parameters
+        HTTPException 500: Database or server error
+    """
+    try:
+        start_time = time.time()
+
+        # Override strategy to hybrid
+        query.strategy = "hybrid"
+
+        # Log search request
+        logger.info(
+            "hybrid_search_request",
+            query=query.query[:100],
+            limit=query.limit,
+            keyword_weight=query.keyword_weight,
+            vector_weight=query.vector_weight,
+            enable_reranking=query.enable_reranking,
+            citations_enabled=citations,
+            citation_limit=citation_limit
+        )
+
+        # Get services
+        embedding_service = get_embedding_service()
+        unified_search_service = get_unified_search_service(db, embedding_service)
+
+        # Execute hybrid search
+        response = unified_search_service.search(
+            query=query.query,
+            strategy="hybrid",
+            filters=query.filters,
+            limit=query.limit,
+            offset=query.offset,
+            # Vector search parameters
+            similarity_threshold=query.similarity_threshold,
+            # Hybrid search parameters
+            keyword_weight=query.keyword_weight,
+            vector_weight=query.vector_weight,
+            keyword_top_k=query.keyword_top_k,
+            vector_top_k=query.vector_top_k,
+            # Advanced reranking parameters
+            enable_reranking=query.enable_reranking,
+            rerank_top_k=query.rerank_top_k,
+            enable_mmr=query.enable_mmr,
+            enable_dedup=query.enable_dedup
+        )
+
+        # Extract citations if enabled
+        if citations:
+            try:
+                from app.services.search.citation_extraction_service import get_citation_service
+
+                citation_service = get_citation_service(db)
+                enriched_results = citation_service.extract_citations(
+                    search_results=response.results,
+                    citation_limit=citation_limit
+                )
+
+                logger.info(
+                    "hybrid_citation_extraction_completed",
+                    num_results=len(enriched_results),
+                    total_citations=sum(len(r.citations) for r in enriched_results)
+                )
+
+                total_time_ms = int((time.time() - start_time) * 1000)
+
+                return SearchResponseWithCitations(
+                    success=response.success,
+                    query=response.query,
+                    total_results=response.total_results,
+                    returned_results=len(enriched_results),
+                    results=enriched_results,
+                    processing_time_ms=total_time_ms,
+                    citations_enabled=True,
+                    filters_applied=response.filters_applied,
+                    reranking_metadata=response.reranking_metadata if hasattr(response, 'reranking_metadata') else None
+                )
+
+            except Exception as e:
+                logger.error(
+                    "hybrid_citation_extraction_failed",
+                    error=str(e),
+                    exc_info=True
+                )
+                # Graceful degradation: return results without citations
+                from app.schemas.search import SearchResultItemWithCitations
+
+                enriched_results = [
+                    SearchResultItemWithCitations(**r.dict())
+                    for r in response.results
+                ]
+
+                total_time_ms = int((time.time() - start_time) * 1000)
+
+                return SearchResponseWithCitations(
+                    success=response.success,
+                    query=response.query,
+                    total_results=response.total_results,
+                    returned_results=len(enriched_results),
+                    results=enriched_results,
+                    processing_time_ms=total_time_ms,
+                    citations_enabled=False,
+                    filters_applied=response.filters_applied,
+                    reranking_metadata=response.reranking_metadata if hasattr(response, 'reranking_metadata') else None
+                )
+
+        # No citations requested
+        from app.schemas.search import SearchResultItemWithCitations
+
+        enriched_results = [
+            SearchResultItemWithCitations(**r.dict())
+            for r in response.results
+        ]
+
+        total_time_ms = int((time.time() - start_time) * 1000)
+
+        logger.info(
+            "hybrid_search_completed",
+            query=query.query[:100],
+            total_results=response.total_results,
+            returned_results=len(enriched_results),
+            processing_time_ms=total_time_ms,
+            citations_enabled=False
+        )
+
+        return SearchResponseWithCitations(
+            success=response.success,
+            query=response.query,
+            total_results=response.total_results,
+            returned_results=len(enriched_results),
+            results=enriched_results,
+            processing_time_ms=total_time_ms,
+            citations_enabled=False,
+            filters_applied=response.filters_applied,
+            reranking_metadata=response.reranking_metadata if hasattr(response, 'reranking_metadata') else None
+        )
+
+    except ValueError as e:
+        logger.warning(
+            "hybrid_search_validation_error",
+            query=query.query[:100],
+            error=str(e)
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid search request: {str(e)}"
+        )
+
+    except RuntimeError as e:
+        logger.error(
+            "hybrid_search_runtime_error",
+            query=query.query[:100],
+            error=str(e),
+            exc_info=True
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Search execution failed: {str(e)}"
+        )
+
+    except Exception as e:
+        logger.error(
+            "hybrid_search_unexpected_error",
+            query=query.query[:100],
+            error=str(e),
+            exc_info=True
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred during search. Please try again later."
+        )
+
+
 @router.post("/unified", response_model=SearchResponseWithCitations, status_code=status.HTTP_200_OK)
 async def unified_search(
     query: UnifiedSearchQuery,
@@ -688,8 +1034,8 @@ async def reranking_health_check(db: Session = Depends(get_db)):
         gpu_available = torch.cuda.is_available()
         health_status["gpu_available"] = gpu_available
 
-        # Get configured device
-        configured_device = settings.RERANKING_DEVICE
+        # Get configured device (reranking uses cross-encoder model)
+        configured_device = settings.CROSS_ENCODER_DEVICE
         actual_device = "cuda" if gpu_available and configured_device == "cuda" else "cpu"
         health_status["device"] = actual_device
 

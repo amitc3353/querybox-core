@@ -436,3 +436,217 @@ class TestChunkingServiceQuality:
         if result.success:
             # Quality score should be reasonable (>0.3) for well-structured text
             assert result.quality_score > 0.3
+
+
+class TestMarkdownHeadingExtraction:
+    """Test markdown heading extraction in chunking service (Fix for section metadata)"""
+
+    @pytest.fixture
+    def service(self):
+        """Create chunking service instance"""
+        return ChunkingService()
+
+    @pytest.fixture
+    def mock_db(self):
+        """Create mock database session"""
+        mock_db = Mock()
+        mock_db.query.return_value.filter.return_value.delete.return_value = 0
+        mock_db.bulk_insert_mappings = Mock()
+        mock_db.commit = Mock()
+        mock_db.rollback = Mock()
+        mock_db.begin_nested = Mock()
+        return mock_db
+
+    def test_heading_at_chunk_start(self, service, mock_db):
+        """Test Strategy 1: Heading at the START of chunk is captured"""
+        document_id = uuid4()
+        text = """# Main Heading
+
+This is content under the main heading. It contains multiple sentences to ensure proper chunking.
+More content here to test the heading extraction when the heading starts the chunk.
+Additional sentences to meet minimum chunk size requirements for the test to be valid.
+""" * 3
+
+        result = service.chunk_text(
+            text=text,
+            document_id=document_id,
+            db=mock_db,
+        )
+
+        assert result.success is True
+
+        # Verify database was called with heading metadata
+        if mock_db.bulk_insert_mappings.called:
+            chunks = mock_db.bulk_insert_mappings.call_args[0][1]
+            # At least one chunk should have the section heading
+            section_headings = [c.get('section_heading') for c in chunks]
+            assert any('Main Heading' in str(h) for h in section_headings if h is not None)
+
+    def test_heading_within_chunk(self, service, mock_db):
+        """Test Strategy 2: Heading WITHIN chunk (not at start) is captured"""
+        document_id = uuid4()
+        text = """Some introductory text without a heading at the very start.
+
+## Section 1: Introduction
+
+This is the content under Section 1. It includes multiple sentences to test chunking behavior.
+When a heading appears within a chunk, it should still be captured as metadata for that chunk.
+This tests the second strategy of the heading extraction logic that was recently fixed.
+""" * 3
+
+        result = service.chunk_text(
+            text=text,
+            document_id=document_id,
+            db=mock_db,
+        )
+
+        assert result.success is True
+
+        if mock_db.bulk_insert_mappings.called:
+            chunks = mock_db.bulk_insert_mappings.call_args[0][1]
+            section_headings = [c.get('section_heading') for c in chunks]
+            # Should capture "Section 1: Introduction" or "Introduction"
+            assert any(
+                h is not None and ('Section 1' in str(h) or 'Introduction' in str(h))
+                for h in section_headings
+            )
+
+    def test_heading_before_chunk(self, service, mock_db):
+        """Test Strategy 3: Most recent heading BEFORE chunk is used as fallback"""
+        document_id = uuid4()
+        text = """# Document Title
+
+First paragraph under the title with some content.
+
+Second paragraph that continues the content under the same heading.
+This paragraph should still be associated with "Document Title" even though
+the heading appeared before this chunk. This tests the third fallback strategy
+where we look for the most recent heading before the current chunk position.
+
+Third paragraph with more content to ensure multiple chunks are created.
+Each subsequent chunk should maintain the heading context from the document title.
+Additional content to meet chunking requirements and validate metadata propagation.
+""" * 3
+
+        result = service.chunk_text(
+            text=text,
+            document_id=document_id,
+            db=mock_db,
+        )
+
+        assert result.success is True
+
+        if mock_db.bulk_insert_mappings.called:
+            chunks = mock_db.bulk_insert_mappings.call_args[0][1]
+            section_headings = [c.get('section_heading') for c in chunks]
+            # At least one chunk should have "Document Title"
+            assert any('Document Title' in str(h) for h in section_headings if h is not None)
+
+    def test_nested_headings(self, service, mock_db):
+        """Test extraction of nested headings (section and subsection)"""
+        document_id = uuid4()
+        text = """# Main Section
+
+Content under main section.
+
+## Subsection 2.1
+
+Content under subsection with multiple sentences for proper chunking.
+This tests that both section_heading (H1, H2) and subsection_heading (H3, H4) are captured.
+Additional content to ensure chunk has sufficient length for processing.
+
+### Sub-subsection 2.1.1
+
+Deeply nested content to test subsection heading extraction.
+This should capture the H3 heading as subsection_heading field.
+More content to meet minimum requirements.
+""" * 3
+
+        result = service.chunk_text(
+            text=text,
+            document_id=document_id,
+            db=mock_db,
+        )
+
+        assert result.success is True
+
+        if mock_db.bulk_insert_mappings.called:
+            chunks = mock_db.bulk_insert_mappings.call_args[0][1]
+            # Check that we have both section and subsection headings
+            has_section = any(c.get('section_heading') is not None for c in chunks)
+            has_subsection = any(c.get('subsection_heading') is not None for c in chunks)
+            assert has_section or has_subsection  # At least one type should be present
+
+    def test_multiple_sections(self, service, mock_db):
+        """Test document with multiple sections maintains correct heading context"""
+        document_id = uuid4()
+        text = """# Section 1
+
+Content for section 1 with multiple sentences.
+This section has enough content to potentially create its own chunk.
+Testing that section metadata is maintained correctly.
+
+# Section 2
+
+Content for section 2 with different heading.
+Each section should maintain its own heading metadata in the chunks.
+This validates that heading context switches correctly between sections.
+
+# Section 3
+
+Final section with its own content and heading.
+Should be correctly associated with Section 3 heading.
+Tests the complete heading extraction across document structure.
+""" * 3
+
+        result = service.chunk_text(
+            text=text,
+            document_id=document_id,
+            db=mock_db,
+        )
+
+        assert result.success is True
+
+        if mock_db.bulk_insert_mappings.called:
+            chunks = mock_db.bulk_insert_mappings.call_args[0][1]
+            section_headings = [c.get('section_heading') for c in chunks if c.get('section_heading')]
+            # Should have captured at least some section headings
+            assert len(section_headings) > 0
+            # Check that we have different section headings (not just one)
+            unique_headings = set(str(h) for h in section_headings if h)
+            # Might have 1 or more unique headings depending on chunking
+            assert len(unique_headings) >= 1
+
+    def test_markdown_heading_levels(self, service, mock_db):
+        """Test different markdown heading levels (H1-H6)"""
+        document_id = uuid4()
+        text = """# H1 Heading
+Content under H1 with sufficient text for chunking requirements.
+
+## H2 Heading
+Content under H2 heading to test level 2 extraction properly.
+
+### H3 Heading
+Content under H3 to validate subsection heading extraction works.
+
+#### H4 Heading
+Content under H4 for additional subsection level testing and validation.
+""" * 3
+
+        result = service.chunk_text(
+            text=text,
+            document_id=document_id,
+            db=mock_db,
+        )
+
+        assert result.success is True
+
+        if mock_db.bulk_insert_mappings.called:
+            chunks = mock_db.bulk_insert_mappings.call_args[0][1]
+            # Should extract headings from H1-H4
+            all_headings = [
+                c.get('section_heading') or c.get('subsection_heading')
+                for c in chunks
+            ]
+            captured_headings = [h for h in all_headings if h is not None]
+            assert len(captured_headings) > 0

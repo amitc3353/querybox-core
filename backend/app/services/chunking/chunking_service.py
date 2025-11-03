@@ -470,15 +470,38 @@ class ChunkingService:
         section_heading = None
         subsection_heading = None
         if doc_structure and doc_structure.headings:
-            # Find most recent heading before this chunk
             chunk_start = sentences[0].start_char if sentences else 0
-            for heading in reversed(doc_structure.headings):
-                if heading.start_char < chunk_start:
+            chunk_end = sentences[-1].end_char if sentences else 0
+
+            # Strategy 1: Check for headings at the START of the chunk (first 50 chars)
+            # This captures headings that begin the chunk (common in markdown)
+            for heading in doc_structure.headings:
+                if chunk_start <= heading.start_char <= chunk_start + 50:
                     if heading.level <= 2:
                         section_heading = heading.text
-                    else:
+                    elif heading.level <= 4:
                         subsection_heading = heading.text
-                    break
+                    break  # Use the first heading in the chunk
+
+            # Strategy 2: If no heading at start, check for ANY heading within the chunk
+            if not section_heading and not subsection_heading:
+                for heading in doc_structure.headings:
+                    if chunk_start <= heading.start_char <= chunk_end:
+                        if heading.level <= 2:
+                            section_heading = heading.text
+                        elif heading.level <= 4:
+                            subsection_heading = heading.text
+                        break  # Use the first heading found in chunk
+
+            # Strategy 3: Fallback - find most recent heading BEFORE this chunk
+            if not section_heading and not subsection_heading:
+                for heading in reversed(doc_structure.headings):
+                    if heading.start_char < chunk_start:
+                        if heading.level <= 2:
+                            section_heading = heading.text
+                        elif heading.level <= 4:
+                            subsection_heading = heading.text
+                        break
 
         # Calculate semantic density (ratio of content words to total words)
         words = chunk_text.split()

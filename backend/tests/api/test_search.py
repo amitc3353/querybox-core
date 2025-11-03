@@ -464,3 +464,321 @@ class TestSearchSpecialCharacters:
         )
 
         assert response.status_code == 200
+
+
+class TestKeywordSearchEndpoint:
+    """Test POST /api/v1/search/keyword endpoint (new dedicated endpoint)"""
+
+    @pytest.fixture
+    def client(self):
+        """Create test client"""
+        return TestClient(app)
+
+    @pytest.fixture
+    def mock_search_response(self):
+        """Create mock search response"""
+        doc_id = str(uuid4())
+        return SearchResponse(
+            success=True,
+            query="test query",
+            total_results=3,
+            returned_results=3,
+            results=[
+                SearchResultItem(
+                    document_id=doc_id,
+                    document_name="sample.pdf",
+                    relevance_score=1.0,
+                    snippet="...this is a **test** snippet...",
+                    chunk_index=0,
+                    chunk_position={"start": 0, "end": 850},
+                    extraction_quality=0.95,
+                    document_type="application/pdf",
+                    created_at=datetime.now(timezone.utc),
+                )
+            ],
+            processing_time_ms=45,
+            filters_applied=None,
+        )
+
+    @patch("app.api.v1.endpoints.search.get_search_service")
+    def test_keyword_endpoint_basic_query(self, mock_get_service, client, mock_search_response):
+        """Test /keyword endpoint works same as root /"""
+        mock_service = Mock()
+        mock_service.search.return_value = mock_search_response
+        mock_get_service.return_value = mock_service
+
+        response = client.post(
+            "/api/v1/search/keyword",
+            json={"query": "test query", "limit": 10},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["success"] is True
+        assert data["query"] == "test query"
+        assert data["total_results"] == 3
+        assert data["returned_results"] == 3
+        assert len(data["results"]) == 1
+
+    @patch("app.api.v1.endpoints.search.get_search_service")
+    def test_keyword_endpoint_with_filters(self, mock_get_service, client):
+        """Test /keyword endpoint with filters"""
+        from app.schemas.search import SearchFilters
+
+        filters = SearchFilters(
+            document_types=["application/pdf"],
+            min_quality=0.7
+        )
+        mock_response = SearchResponse(
+            success=True,
+            query="python",
+            total_results=5,
+            returned_results=3,
+            results=[],
+            processing_time_ms=50,
+            filters_applied=filters,
+        )
+
+        mock_service = Mock()
+        mock_service.search.return_value = mock_response
+        mock_get_service.return_value = mock_service
+
+        response = client.post(
+            "/api/v1/search/keyword",
+            json={
+                "query": "python",
+                "filters": {
+                    "document_types": ["application/pdf"],
+                    "min_quality": 0.7,
+                },
+                "limit": 5,
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["filters_applied"] is not None
+        assert data["filters_applied"]["min_quality"] == 0.7
+
+    @patch("app.api.v1.endpoints.search.get_search_service")
+    def test_keyword_endpoint_pagination(self, mock_get_service, client, mock_search_response):
+        """Test /keyword endpoint with pagination"""
+        mock_service = Mock()
+        mock_service.search.return_value = mock_search_response
+        mock_get_service.return_value = mock_service
+
+        response = client.post(
+            "/api/v1/search/keyword",
+            json={"query": "test", "limit": 10, "offset": 5},
+        )
+
+        assert response.status_code == 200
+        # Verify service was called with correct offset
+        mock_service.search.assert_called_once()
+        call_kwargs = mock_service.search.call_args[1]
+        assert call_kwargs["offset"] == 5
+
+    @patch("app.api.v1.endpoints.search.get_search_service")
+    def test_keyword_endpoint_same_as_root(self, mock_get_service, client, mock_search_response):
+        """Test /keyword and root / endpoints return same results"""
+        mock_service = Mock()
+        mock_service.search.return_value = mock_search_response
+        mock_get_service.return_value = mock_service
+
+        # Call both endpoints with same query
+        response_root = client.post(
+            "/api/v1/search/",
+            json={"query": "test", "limit": 10},
+        )
+
+        response_keyword = client.post(
+            "/api/v1/search/keyword",
+            json={"query": "test", "limit": 10},
+        )
+
+        assert response_root.status_code == 200
+        assert response_keyword.status_code == 200
+
+        # Both should have same structure
+        data_root = response_root.json()
+        data_keyword = response_keyword.json()
+
+        assert data_root["total_results"] == data_keyword["total_results"]
+        assert data_root["returned_results"] == data_keyword["returned_results"]
+
+
+class TestHybridSearchEndpoint:
+    """Test POST /api/v1/search/hybrid endpoint (new dedicated endpoint)"""
+
+    @pytest.fixture
+    def client(self):
+        """Create test client"""
+        return TestClient(app)
+
+    @pytest.fixture
+    def mock_hybrid_response(self):
+        """Create mock hybrid search response with citations"""
+        from app.schemas.search import SearchResponseWithCitations, SearchResultItemWithCitations
+
+        doc_id = str(uuid4())
+        return SearchResponseWithCitations(
+            success=True,
+            query="machine learning",
+            total_results=100,
+            returned_results=5,
+            results=[
+                SearchResultItemWithCitations(
+                    document_id=doc_id,
+                    document_name="ml_guide.pdf",
+                    relevance_score=0.95,
+                    snippet="...machine learning algorithms...",
+                    chunk_index=0,
+                    chunk_position={"start": 0, "end": 850},
+                    extraction_quality=0.95,
+                    document_type="application/pdf",
+                    created_at=datetime.now(timezone.utc),
+                    citations=[],
+                )
+            ],
+            processing_time_ms=150,
+            citations_enabled=True,
+            filters_applied=None,
+            reranking_metadata=None,
+        )
+
+    @patch("app.api.v1.endpoints.search.get_unified_search_service")
+    @patch("app.api.v1.endpoints.search.get_embedding_service")
+    @patch("app.services.search.citation_extraction_service.get_citation_service")
+    def test_hybrid_endpoint_basic_query(self, mock_citation_service, mock_embedding_service, mock_unified_service, client):
+        """Test /hybrid endpoint works correctly"""
+        from app.schemas.search import SearchResponse, SearchResultItem
+
+        # Mock search response
+        mock_response = SearchResponse(
+            success=True,
+            query="test",
+            total_results=10,
+            returned_results=5,
+            results=[
+                SearchResultItem(
+                    document_id=str(uuid4()),
+                    document_name="test.pdf",
+                    relevance_score=0.9,
+                    snippet="test snippet",
+                    chunk_index=0,
+                    extraction_quality=0.95,
+                    document_type="application/pdf",
+                    created_at=datetime.now(timezone.utc),
+                )
+            ],
+            processing_time_ms=100,
+        )
+
+        mock_unified_service.return_value.search.return_value = mock_response
+
+        # Mock citation service
+        from app.schemas.search import SearchResultItemWithCitations
+        enriched = [SearchResultItemWithCitations(**r.dict()) for r in mock_response.results]
+        mock_citation_service.return_value.extract_citations.return_value = enriched
+
+        response = client.post(
+            "/api/v1/search/hybrid",
+            json={"query": "test", "limit": 5},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["citations_enabled"] is True
+
+    @patch("app.api.v1.endpoints.search.get_unified_search_service")
+    @patch("app.api.v1.endpoints.search.get_embedding_service")
+    def test_hybrid_endpoint_strategy_override(self, mock_embedding_service, mock_unified_service, client):
+        """Test /hybrid endpoint always uses hybrid strategy"""
+        from app.schemas.search import SearchResponse
+
+        mock_response = SearchResponse(
+            success=True,
+            query="test",
+            total_results=5,
+            returned_results=5,
+            results=[],
+            processing_time_ms=100,
+        )
+
+        mock_unified_service.return_value.search.return_value = mock_response
+
+        response = client.post(
+            "/api/v1/search/hybrid",
+            json={"query": "test", "limit": 5},
+        )
+
+        # Verify strategy was set to "hybrid"
+        mock_unified_service.return_value.search.assert_called_once()
+        call_kwargs = mock_unified_service.return_value.search.call_args[1]
+        assert call_kwargs["strategy"] == "hybrid"
+
+    @patch("app.api.v1.endpoints.search.get_unified_search_service")
+    @patch("app.api.v1.endpoints.search.get_embedding_service")
+    def test_hybrid_endpoint_with_reranking(self, mock_embedding_service, mock_unified_service, client):
+        """Test /hybrid endpoint with reranking enabled"""
+        from app.schemas.search import SearchResponse
+
+        mock_response = SearchResponse(
+            success=True,
+            query="test",
+            total_results=10,
+            returned_results=5,
+            results=[],
+            processing_time_ms=200,
+        )
+
+        mock_unified_service.return_value.search.return_value = mock_response
+
+        response = client.post(
+            "/api/v1/search/hybrid",
+            json={
+                "query": "test",
+                "limit": 5,
+                "enable_reranking": True,
+                "rerank_top_k": 50,
+            },
+        )
+
+        assert response.status_code == 200
+
+        # Verify reranking params passed
+        call_kwargs = mock_unified_service.return_value.search.call_args[1]
+        assert call_kwargs["enable_reranking"] is True
+        assert call_kwargs["rerank_top_k"] == 50
+
+    @patch("app.api.v1.endpoints.search.get_unified_search_service")
+    @patch("app.api.v1.endpoints.search.get_embedding_service")
+    @patch("app.services.search.citation_extraction_service.get_citation_service")
+    def test_hybrid_endpoint_without_citations(self, mock_citation_service, mock_embedding_service, mock_unified_service, client):
+        """Test /hybrid endpoint with citations disabled"""
+        from app.schemas.search import SearchResponse
+
+        mock_response = SearchResponse(
+            success=True,
+            query="test",
+            total_results=5,
+            returned_results=5,
+            results=[],
+            processing_time_ms=100,
+        )
+
+        mock_unified_service.return_value.search.return_value = mock_response
+
+        response = client.post(
+            "/api/v1/search/hybrid?citations=false",
+            json={"query": "test", "limit": 5},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["citations_enabled"] is False
+
+        # Citation service should not be called
+        mock_citation_service.return_value.extract_citations.assert_not_called()

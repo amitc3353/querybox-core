@@ -143,6 +143,17 @@ class CrossEncoderService:
                 pairs_count=len(query_doc_pairs)
             )
 
+            # Log sample pairs for debugging
+            if query_doc_pairs:
+                sample_pair = query_doc_pairs[0]
+                logger.debug(
+                    "rerank_sample_pair",
+                    query=sample_pair[0][:100],
+                    doc_text=sample_pair[1][:100],
+                    query_length=len(sample_pair[0]),
+                    doc_length=len(sample_pair[1])
+                )
+
             # Step 2: Batch encode and score
             # Returns list of relevance scores (float, unbounded logits)
             try:
@@ -183,7 +194,9 @@ class CrossEncoderService:
             reranked_candidates = []
             for candidate, score in zip(candidates, normalized_scores):
                 # Create new SearchResultItem with updated relevance_score
+                # IMPORTANT: Preserve chunk_id and embedding for citation extraction, MMR, and dedup
                 reranked_item = SearchResultItem(
+                    chunk_id=candidate.chunk_id,  # Preserve chunk_id for citation extraction
                     document_id=candidate.document_id,
                     document_name=candidate.document_name,
                     relevance_score=score,
@@ -192,7 +205,8 @@ class CrossEncoderService:
                     chunk_position=candidate.chunk_position,
                     extraction_quality=candidate.extraction_quality,
                     document_type=candidate.document_type,
-                    created_at=candidate.created_at
+                    created_at=candidate.created_at,
+                    embedding=candidate.embedding  # Preserve embedding for MMR diversity and semantic dedup
                 )
                 reranked_candidates.append(reranked_item)
 
@@ -238,6 +252,23 @@ class CrossEncoderService:
         # If no snippet, this is a fallback (shouldn't happen in normal flow)
         if not text:
             text = f"Document: {candidate.document_name}"
+            logger.warning(
+                "cross_encoder_using_fallback_empty_snippet",
+                document_id=candidate.document_id,
+                document_name=candidate.document_name
+            )
+
+        # Validate minimum length (cross-encoder needs substantial text)
+        if len(text) < 20:
+            logger.warning(
+                "cross_encoder_input_too_short",
+                document_id=candidate.document_id,
+                text_length=len(text),
+                text_preview=text[:100]
+            )
+            # Enhance with document name if snippet is too short
+            if candidate.document_name:
+                text = f"{candidate.document_name}: {text}"
 
         # Truncate to prevent token overflow
         # Rough estimate: 1 token ≈ 4 characters

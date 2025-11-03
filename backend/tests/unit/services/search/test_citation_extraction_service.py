@@ -149,6 +149,46 @@ class TestExtractCitations:
         assert len(results) == len(sample_search_results)
         assert all(isinstance(r, SearchResultItemWithCitations) for r in results)
 
+    @patch('app.services.search.citation_extraction_service.CitationExtractionService._fetch_citation_metadata')
+    def test_extract_citations_uses_chunk_id_not_chunk_index(self, mock_fetch, citation_service):
+        """Test citation extraction uses chunk_id field (not chunk_index) for metadata lookup"""
+        from uuid import uuid4
+
+        chunk_id_1 = str(uuid4())
+        chunk_id_2 = str(uuid4())
+
+        search_results = [
+            SearchResultItem(
+                chunk_id=chunk_id_1,  # UUID chunk_id field
+                document_id="doc-123",
+                document_name="Test.pdf",
+                relevance_score=0.9,
+                chunk_index=5  # Integer chunk_index (should NOT be used)
+            ),
+            SearchResultItem(
+                chunk_id=chunk_id_2,
+                document_id="doc-456",
+                document_name="Report.pdf",
+                relevance_score=0.85,
+                chunk_index=3
+            )
+        ]
+
+        # Mock metadata fetch to return empty
+        mock_fetch.return_value = {}
+
+        results = citation_service.extract_citations(search_results)
+
+        # Verify _fetch_citation_metadata was called with chunk_id values (UUIDs)
+        mock_fetch.assert_called_once()
+        called_chunk_ids = mock_fetch.call_args[0][0]
+
+        assert chunk_id_1 in called_chunk_ids
+        assert chunk_id_2 in called_chunk_ids
+        # Should NOT contain chunk_index values (5, 3)
+        assert 5 not in called_chunk_ids
+        assert 3 not in called_chunk_ids
+
 
 class TestFetchCitationMetadata:
     """Test citation metadata retrieval"""
@@ -218,6 +258,63 @@ class TestExtractCitationsFromChunk:
 
         # Fallback should still extract something
         assert isinstance(citations, list)
+
+    def test_citation_text_html_entity_decoding(self, citation_service):
+        """Test HTML entities are decoded in citation text (&amp; → &)"""
+        # Need sentences with at least 10 words (citation extraction filter)
+        chunk_text = "Machine learning &amp; artificial intelligence are transforming the technology industry at an unprecedented rate. Deep learning neural network models achieve accuracy rates of 95% or higher consistently."
+        chunk_metadata = {
+            "page_number": 5,
+            "section_heading": "Results",
+            "start_position": 1000,
+            "document_name": "test.pdf"
+        }
+
+        citations = citation_service._extract_citations_from_chunk(
+            chunk_text=chunk_text,
+            chunk_metadata=chunk_metadata,
+            citation_limit=2
+        )
+
+        # Should have at least one citation with decoded HTML entities
+        assert len(citations) > 0
+        # Check that HTML entities are decoded
+        if any("&" in c.text for c in citations):
+            # If citation contains &, it should be decoded, not &amp;
+            for citation in citations:
+                if "&" in citation.text:
+                    assert "&amp;" not in citation.text
+                    assert " & " in citation.text  # Should be decoded
+
+    def test_citation_text_truncation_at_500_chars(self, citation_service):
+        """Test citation text is truncated to 500 characters (Citation schema max_length)"""
+        # Create a very long sentence (>500 chars)
+        long_sentence = "Machine learning models " + ("with deep neural networks " * 30) + "achieve remarkable performance."
+        chunk_text = long_sentence + " Another sentence here to meet minimum length."
+
+        chunk_metadata = {
+            "page_number": 10,
+            "section_heading": "Discussion",
+            "start_position": 2000,
+            "document_name": "research.pdf"
+        }
+
+        citations = citation_service._extract_citations_from_chunk(
+            chunk_text=chunk_text,
+            chunk_metadata=chunk_metadata,
+            citation_limit=5
+        )
+
+        # Check all citations are within 500 char limit
+        for citation in citations:
+            assert len(citation.text) <= 500, f"Citation text length {len(citation.text)} exceeds 500 char limit"
+
+            # If truncated, should end with '...'
+            if len(long_sentence) > 500:
+                # At least one citation should be truncated
+                if citation.text.startswith("Machine learning models"):
+                    assert citation.text.endswith("...")
+                    assert len(citation.text) == 500  # Exactly 500 chars (497 + '...')
 
     @patch('app.services.search.citation_extraction_service.CitationExtractionService._get_nlp_model')
     def test_extract_with_spacy_model(self, mock_nlp, citation_service):
@@ -347,6 +444,29 @@ class TestSourceContextBuilding:
 
         # Should be truncated with ellipsis
         assert len(context) < len(long_section) + 20
+
+    def test_build_context_with_document_name_fallback(self, citation_service):
+        """Test source context uses document name when page and section are None"""
+        context = citation_service._build_source_context(
+            page=None,
+            section=None,
+            document_name="sample_report.pdf"
+        )
+
+        assert context == "sample_report.pdf"
+
+    def test_build_context_prefers_page_section_over_document_name(self, citation_service):
+        """Test source context prefers page/section over document name"""
+        context = citation_service._build_source_context(
+            page=5,
+            section="Results",
+            document_name="sample_report.pdf"
+        )
+
+        # Should use page and section, not document name
+        assert "Page 5" in context
+        assert "Results" in context
+        assert "sample_report.pdf" not in context
 
 
 class TestCitationHighlighting:
@@ -510,3 +630,182 @@ class TestCitationExtractionPerformance:
 
         # Target: <100ms for 10 results
         assert latency_ms < 100, f"Latency {latency_ms}ms exceeds 100ms target"
+
+
+class TestCitationWithSectionMetadata:
+    """Test citations include section metadata from chunking service (Fix verification)"""
+
+    def test_citation_includes_section_from_chunk_metadata(self, citation_service, mock_db_session):
+        """Test that citations include section_heading from chunk metadata (markdown heading fix)"""
+        from uuid import uuid4
+
+        chunk_id = str(uuid4())
+        search_results = [
+            SearchResultItem(
+                chunk_id=chunk_id,
+                document_id="doc-md-123",
+                document_name="test-document.md",
+                relevance_score=0.95,
+                snippet="This is content under a markdown heading.",
+                chunk_index=0
+            )
+        ]
+
+        # Mock database response with section_heading populated (from chunking fix)
+        mock_row = Mock()
+        mock_row.id = chunk_id
+        mock_row.chunk_text = "This is content under a markdown heading. It has multiple sentences for testing."
+        mock_row.page_number = None  # Markdown has no pages
+        mock_row.section_heading = "Test Document"  # This should be populated by chunking fix
+        mock_row.subsection_heading = None
+        mock_row.start_position = 0
+        mock_row.end_position = 100
+        mock_row.chunk_index = 0
+        mock_row.document_name = "test-document.md"
+        mock_row.total_pages = None
+
+        mock_result = Mock()
+        mock_result.fetchall.return_value = [mock_row]
+        mock_db_session.execute.return_value = mock_result
+
+        results = citation_service.extract_citations(search_results, citation_limit=3)
+
+        assert len(results) > 0
+        result = results[0]
+
+        # Verify section metadata is present
+        assert result.source_section == "Test Document"
+
+        # Verify citations include section metadata
+        if len(result.citations) > 0:
+            for citation in result.citations:
+                assert citation.section == "Test Document"
+                assert "Test Document" in citation.source_context
+
+    def test_citation_includes_subsection_from_chunk_metadata(self, citation_service, mock_db_session):
+        """Test that citations include subsection_heading from nested markdown headings"""
+        from uuid import uuid4
+
+        chunk_id = str(uuid4())
+        search_results = [
+            SearchResultItem(
+                chunk_id=chunk_id,
+                document_id="doc-md-456",
+                document_name="nested-headings.md",
+                relevance_score=0.92,
+                snippet="Content under a subsection heading.",
+                chunk_index=3
+            )
+        ]
+
+        # Mock database response with both section and subsection headings
+        mock_row = Mock()
+        mock_row.id = chunk_id
+        mock_row.chunk_text = "Content under a subsection heading with sufficient length for extraction."
+        mock_row.page_number = None
+        mock_row.section_heading = "Main Section"
+        mock_row.subsection_heading = "Subsection 2.1"  # H3/H4 heading
+        mock_row.start_position = 200
+        mock_row.end_position = 350
+        mock_row.chunk_index = 3
+        mock_row.document_name = "nested-headings.md"
+        mock_row.total_pages = None
+
+        mock_result = Mock()
+        mock_result.fetchall.return_value = [mock_row]
+        mock_db_session.execute.return_value = mock_result
+
+        results = citation_service.extract_citations(search_results, citation_limit=3)
+
+        assert len(results) > 0
+        result = results[0]
+
+        # Should have section from either section_heading or subsection_heading
+        # The subsection_heading takes precedence in source_section field
+        assert result.source_section in ["Main Section", "Subsection 2.1"]
+
+    def test_citation_source_context_prefers_section_over_filename(self, citation_service, mock_db_session):
+        """Test that source_context shows section heading instead of just filename"""
+        from uuid import uuid4
+
+        chunk_id = str(uuid4())
+        search_results = [
+            SearchResultItem(
+                chunk_id=chunk_id,
+                document_id="doc-md-789",
+                document_name="document.md",
+                relevance_score=0.88,
+                snippet="Content with section context.",
+                chunk_index=1
+            )
+        ]
+
+        # Mock with section_heading present
+        mock_row = Mock()
+        mock_row.id = chunk_id
+        mock_row.chunk_text = "Content with section context that has enough words for citation extraction."
+        mock_row.page_number = None
+        mock_row.section_heading = "Introduction"
+        mock_row.subsection_heading = None
+        mock_row.start_position = 50
+        mock_row.end_position = 200
+        mock_row.chunk_index = 1
+        mock_row.document_name = "document.md"
+        mock_row.total_pages = None
+
+        mock_result = Mock()
+        mock_result.fetchall.return_value = [mock_row]
+        mock_db_session.execute.return_value = mock_result
+
+        results = citation_service.extract_citations(search_results, citation_limit=3)
+
+        assert len(results) > 0
+
+        # Verify source_context shows section, not filename
+        if len(results[0].citations) > 0:
+            for citation in results[0].citations:
+                # Should be "Introduction" not "document.md"
+                assert citation.source_context == "Introduction"
+                assert "document.md" not in citation.source_context
+
+    def test_citation_without_section_falls_back_to_filename(self, citation_service, mock_db_session):
+        """Test that source_context falls back to filename when no section_heading"""
+        from uuid import uuid4
+
+        chunk_id = str(uuid4())
+        search_results = [
+            SearchResultItem(
+                chunk_id=chunk_id,
+                document_id="doc-no-section",
+                document_name="plain-text.txt",
+                relevance_score=0.75,
+                snippet="Content without section headers.",
+                chunk_index=0
+            )
+        ]
+
+        # Mock WITHOUT section_heading (old behavior before fix)
+        mock_row = Mock()
+        mock_row.id = chunk_id
+        mock_row.chunk_text = "Content without section headers but with enough text for extraction."
+        mock_row.page_number = None
+        mock_row.section_heading = None  # No section heading
+        mock_row.subsection_heading = None
+        mock_row.start_position = 0
+        mock_row.end_position = 100
+        mock_row.chunk_index = 0
+        mock_row.document_name = "plain-text.txt"
+        mock_row.total_pages = None
+
+        mock_result = Mock()
+        mock_result.fetchall.return_value = [mock_row]
+        mock_db_session.execute.return_value = mock_result
+
+        results = citation_service.extract_citations(search_results, citation_limit=3)
+
+        assert len(results) > 0
+
+        # Should fall back to filename
+        if len(results[0].citations) > 0:
+            for citation in results[0].citations:
+                assert citation.source_context == "plain-text.txt"

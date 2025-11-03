@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 import logging
 from app.core.config import settings
 from app.api.v1.router import api_router
+from app.middleware import PerformanceTrackingMiddleware
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -49,6 +50,13 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+# Add performance tracking middleware
+app.add_middleware(
+    PerformanceTrackingMiddleware,
+    track_request_body=True,
+    track_response_body=True
 )
 
 app.include_router(api_router, prefix=settings.API_V1_STR)

@@ -97,6 +97,7 @@ class SearchQuery(BaseModel):
 
 class SearchResultItem(BaseModel):
     """Individual search result"""
+    chunk_id: Optional[str] = Field(None, description="Chunk/Embedding UUID (for citation extraction)")
     document_id: str = Field(..., description="Document UUID")
     document_name: str = Field(..., description="Document display name")
     relevance_score: float = Field(..., ge=0.0, le=1.0, description="Relevance score (0.0-1.0)")
@@ -106,6 +107,7 @@ class SearchResultItem(BaseModel):
     extraction_quality: Optional[float] = Field(None, ge=0.0, le=1.0, description="Extraction quality score")
     document_type: Optional[str] = Field(None, description="Document MIME type")
     created_at: Optional[datetime] = Field(None, description="Document creation timestamp")
+    embedding: Optional[List[float]] = Field(None, description="Embedding vector for MMR diversity and semantic deduplication")
 
     class Config:
         json_schema_extra = {
@@ -314,14 +316,15 @@ class UnifiedSearchQuery(BaseModel):
         """Validate rerank_top_k parameter (Step 10.2 - Phase 5)"""
         if v is not None:
             # rerank_top_k should be greater than final limit
-            limit = values.get('limit', 10)
+            limit = values.get('limit') or 10
             if v < limit:
                 raise ValueError(f"rerank_top_k ({v}) should be >= limit ({limit}) to have enough candidates for final selection")
 
             # rerank_top_k should be reasonable relative to candidate pool
-            keyword_top_k = values.get('keyword_top_k', 100)
-            vector_top_k = values.get('vector_top_k', 100)
-            max_candidates = max(keyword_top_k, vector_top_k) if keyword_top_k and vector_top_k else 100
+            # Handle None values explicitly (Optional fields default to None, not the .get() default)
+            keyword_top_k = values.get('keyword_top_k') or 100
+            vector_top_k = values.get('vector_top_k') or 100
+            max_candidates = max(keyword_top_k, vector_top_k)
 
             if v > max_candidates:
                 raise ValueError(f"rerank_top_k ({v}) should be <= max candidate pool size ({max_candidates})")
@@ -378,9 +381,10 @@ class UnifiedSearchQuery(BaseModel):
                 raise ValueError(f"Reranking is only supported for 'hybrid' strategy, got '{strategy}'")
 
             # Check if we have enough candidates to make reranking worthwhile
-            keyword_top_k = values.get('keyword_top_k', 100)
-            vector_top_k = values.get('vector_top_k', 100)
-            limit = values.get('limit', 10)
+            # Handle None values explicitly (Optional fields default to None, not the .get() default)
+            keyword_top_k = values.get('keyword_top_k') or 100
+            vector_top_k = values.get('vector_top_k') or 100
+            limit = values.get('limit') or 10
 
             total_candidates = keyword_top_k + vector_top_k
             if total_candidates < 50:

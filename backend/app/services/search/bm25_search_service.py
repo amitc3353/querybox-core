@@ -129,6 +129,7 @@ class BM25SearchService:
 
             if bm25_score > 0:
                 scored_results.append({
+                    'chunk_id': candidate['chunk_id'],  # For citation extraction
                     'document_id': str(candidate['document_id']),
                     'document_name': candidate['document_name'],
                     'document_type': candidate['mime_type'],
@@ -140,7 +141,8 @@ class BM25SearchService:
                         'end': candidate['end_position']
                     } if candidate['start_position'] is not None else None,
                     'extraction_quality': candidate['extraction_quality'],
-                    'created_at': candidate['created_at']
+                    'created_at': candidate['created_at'],
+                    'embedding': candidate.get('embedding')  # For MMR and semantic dedup
                 })
 
         # Sort by BM25 score (descending)
@@ -218,7 +220,8 @@ class BM25SearchService:
         avg_chunk_length_chars = result.avg_chunk_length or 1000
 
         # Estimate avg word count (approx 5 chars per word)
-        avg_chunk_length_words = avg_chunk_length_chars / 5.0
+        # Convert Decimal to float for arithmetic operations
+        avg_chunk_length_words = float(avg_chunk_length_chars) / 5.0
 
         self._corpus_stats_cache = {
             'total_chunks': total_chunks,
@@ -254,6 +257,7 @@ class BM25SearchService:
         tsquery = ' & '.join([term.replace("'", "''") for term in query_terms])
 
         # Build base query
+        # Use LEFT JOIN for DocumentText to include embeddings even when DocumentText is missing
         query = self.db.query(
             Embedding.id,
             Embedding.document_id,
@@ -261,13 +265,14 @@ class BM25SearchService:
             Embedding.chunk_index,
             Embedding.start_position,
             Embedding.end_position,
+            Embedding.embedding,  # Include embedding for MMR and semantic dedup
             Document.document_name,
             Document.mime_type,
             Document.created_at,
             DocumentText.extraction_quality
         ).join(
             Document, Embedding.document_id == Document.id
-        ).join(
+        ).outerjoin(
             DocumentText, Embedding.document_id == DocumentText.document_id
         ).filter(
             # Full-text search condition
@@ -292,7 +297,21 @@ class BM25SearchService:
         # Convert to dict
         candidates = []
         for row in results:
+            # Convert pgvector embedding to list of floats
+            embedding_list = None
+            if hasattr(row, 'embedding') and row.embedding is not None:
+                try:
+                    # pgvector returns the embedding as a list already
+                    embedding_list = list(row.embedding) if hasattr(row.embedding, '__iter__') else None
+                except Exception as e:
+                    logger.debug(
+                        "embedding_conversion_failed",
+                        chunk_id=str(row.id),
+                        error=str(e)
+                    )
+
             candidates.append({
+                'chunk_id': str(row.id),  # For citation extraction
                 'id': str(row.id),
                 'document_id': row.document_id,
                 'chunk_text': row.chunk_text,
@@ -302,7 +321,8 @@ class BM25SearchService:
                 'document_name': row.document_name,
                 'mime_type': row.mime_type,
                 'created_at': row.created_at,
-                'extraction_quality': row.extraction_quality
+                'extraction_quality': row.extraction_quality,
+                'embedding': embedding_list  # For MMR and semantic dedup
             })
 
         return candidates
@@ -522,6 +542,7 @@ class BM25SearchService:
         for result in results:
             result_items.append(
                 SearchResultItem(
+                    chunk_id=result.get('chunk_id'),  # For citation extraction
                     document_id=result['document_id'],
                     document_name=result['document_name'],
                     relevance_score=result['relevance_score'],
@@ -530,7 +551,8 @@ class BM25SearchService:
                     chunk_position=result['chunk_position'],
                     extraction_quality=result['extraction_quality'],
                     document_type=result['document_type'],
-                    created_at=result['created_at']
+                    created_at=result['created_at'],
+                    embedding=result.get('embedding')  # For MMR and semantic dedup
                 )
             )
         return result_items

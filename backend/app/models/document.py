@@ -105,7 +105,9 @@ class Document(Base):
     processing_reason = Column(Text)
     
     # Relationships
-    versions = relationship("DocumentVersion", back_populates="document", cascade="all, delete-orphan")
+    # Note: lazy="select" prevents automatic loading during delete operations
+    # This avoids schema mismatch errors when document_versions table schema is out of sync
+    versions = relationship("DocumentVersion", back_populates="document", cascade="all, delete-orphan", lazy="select")
     document_text = relationship("DocumentText", back_populates="document", uselist=False, cascade="all, delete-orphan")
     processing_status = relationship("ProcessingStatus", back_populates="document", cascade="all, delete-orphan")
     embeddings = relationship("Embedding", back_populates="document", cascade="all, delete-orphan")

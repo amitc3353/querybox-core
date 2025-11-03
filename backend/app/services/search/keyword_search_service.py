@@ -249,6 +249,7 @@ class KeywordSearchService:
         """
         # Build base query
         query = self.db.query(
+            Embedding.id.label('chunk_id'),
             Embedding.document_id,
             Document.document_name,
             Document.mime_type,
@@ -297,6 +298,7 @@ class KeywordSearchService:
         chunk_results = []
         for row in results:
             chunk_results.append({
+                'chunk_id': str(row.chunk_id),
                 'document_id': str(row.document_id),
                 'document_name': row.document_name,
                 'document_type': row.mime_type,
@@ -493,6 +495,7 @@ class KeywordSearchService:
         for result in results:
             result_items.append(
                 SearchResultItem(
+                    chunk_id=result.get('chunk_id'),
                     document_id=result['document_id'],
                     document_name=result['document_name'],
                     relevance_score=result['relevance_score'],

@@ -123,6 +123,7 @@ class RRFRanker:
 
             # Create new item with updated RRF score
             fused_item = SearchResultItem(
+                chunk_id=item.chunk_id,  # Preserve chunk_id for citation extraction
                 document_id=item.document_id,
                 document_name=item.document_name,
                 relevance_score=rrf_score,
@@ -131,7 +132,8 @@ class RRFRanker:
                 chunk_position=item.chunk_position,
                 extraction_quality=item.extraction_quality,
                 document_type=item.document_type,
-                created_at=item.created_at
+                created_at=item.created_at,
+                embedding=item.embedding  # Preserve embedding for MMR and dedup
             )
 
             fused_results.append(fused_item)
@@ -243,6 +245,7 @@ class RRFRanker:
             normalized_score = item.relevance_score / max_score
 
             normalized_item = SearchResultItem(
+                chunk_id=item.chunk_id,  # Preserve chunk_id for citation extraction
                 document_id=item.document_id,
                 document_name=item.document_name,
                 relevance_score=round(normalized_score, 4),
@@ -251,7 +254,8 @@ class RRFRanker:
                 chunk_position=item.chunk_position,
                 extraction_quality=item.extraction_quality,
                 document_type=item.document_type,
-                created_at=item.created_at
+                created_at=item.created_at,
+                embedding=item.embedding  # Preserve embedding for MMR and dedup
             )
 
             normalized_results.append(normalized_item)

@@ -215,11 +215,11 @@ def chunk_document_text(self, document_id: str):
                 f"Chunking failed for document {document_id}: {result.error_message}"
             )
 
-            tracker.mark_stage_failed_sync(
+            run_async(tracker.mark_stage_failed(
                 document_id=doc_uuid,
                 stage=ProcessingStageEnum.CHUNKING,
                 error_message=result.error_message or "Chunking failed",
-            )
+            ))
 
             # Retry if possible
             if self.request.retries < self.max_retries:

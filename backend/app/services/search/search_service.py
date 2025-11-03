@@ -55,38 +55,12 @@ class SearchService:
         self.bm25 = BM25SearchService(db)
         self.vector = VectorSearchService(db, embedding_service) if embedding_service else None
 
-        # Initialize reranking pipeline (Step 10.2)
-        self.reranking_pipeline = None
-        enable_reranking = enable_reranking if enable_reranking is not None else settings.ENABLE_RERANKING
+        # Store reranking settings for lazy initialization (Step 10.2)
+        self._reranking_pipeline = None
+        self._reranking_enabled = enable_reranking if enable_reranking is not None else settings.ENABLE_RERANKING
+        self._reranking_init_attempted = False
 
-        if enable_reranking:
-            try:
-                logger.info("initializing_reranking_pipeline")
-
-                # Initialize component services
-                cross_encoder = CrossEncoderService()
-                mmr_ranker = MMRRanker()
-                dedup_service = DeduplicationService()
-
-                # Create reranking pipeline
-                self.reranking_pipeline = RerankingPipeline(
-                    cross_encoder=cross_encoder,
-                    mmr_ranker=mmr_ranker,
-                    dedup_service=dedup_service
-                )
-
-                logger.info("reranking_pipeline_initialized_successfully")
-
-            except Exception as e:
-                logger.error(
-                    "reranking_pipeline_initialization_failed",
-                    error=str(e),
-                    exc_info=True,
-                    note="Reranking will not be available. Hybrid search will work without reranking."
-                )
-                self.reranking_pipeline = None
-
-        # Initialize hybrid search if vector search is available
+        # Initialize hybrid search if vector search is available (reranking will be lazy-loaded)
         self.hybrid = None
         if self.vector is not None:
             self.hybrid = HybridSearchService(
@@ -94,7 +68,7 @@ class SearchService:
                 bm25_service=self.bm25,
                 vector_service=self.vector,
                 rrf_ranker=RRFRanker(),
-                reranking_pipeline=self.reranking_pipeline
+                reranking_pipeline=None  # Will be lazy-loaded via property
             )
 
         logger.info(
@@ -102,8 +76,54 @@ class SearchService:
             keyword_available=True,
             vector_available=self.vector is not None,
             hybrid_available=self.hybrid is not None,
-            reranking_available=self.reranking_pipeline is not None
+            reranking_lazy_load_enabled=self._reranking_enabled
         )
+
+    @property
+    def reranking_pipeline(self):
+        """
+        Lazy load reranking pipeline on first access
+
+        This prevents loading heavy ML models (cross-encoder, MMR, deduplication)
+        during SearchService initialization. Models are only loaded when reranking
+        is actually requested via enable_reranking=True.
+
+        Returns:
+            RerankingPipeline instance or None if disabled/failed
+        """
+        if self._reranking_pipeline is None and self._reranking_enabled and not self._reranking_init_attempted:
+            self._reranking_init_attempted = True
+            try:
+                logger.info("lazy_loading_reranking_pipeline")
+
+                # Initialize component services
+                cross_encoder = CrossEncoderService()
+                mmr_ranker = MMRRanker()
+                dedup_service = DeduplicationService()
+
+                # Create reranking pipeline
+                self._reranking_pipeline = RerankingPipeline(
+                    cross_encoder=cross_encoder,
+                    mmr_ranker=mmr_ranker,
+                    dedup_service=dedup_service
+                )
+
+                # Update hybrid search service with initialized pipeline
+                if self.hybrid is not None:
+                    self.hybrid.reranking_pipeline = self._reranking_pipeline
+
+                logger.info("reranking_pipeline_lazy_loaded_successfully")
+
+            except Exception as e:
+                logger.error(
+                    "reranking_pipeline_lazy_loading_failed",
+                    error=str(e),
+                    exc_info=True,
+                    note="Reranking will not be available. Hybrid search will work without reranking."
+                )
+                self._reranking_pipeline = None
+
+        return self._reranking_pipeline
 
     def search(
         self,
@@ -163,7 +183,7 @@ class SearchService:
                 filters=filters,
                 limit=limit,
                 offset=offset,
-                **kwargs  # Pass through similarity_threshold, etc.
+                similarity_threshold=kwargs.get('similarity_threshold') or 0.0
             )
 
         elif strategy == "hybrid":
@@ -171,6 +191,13 @@ class SearchService:
                 raise ValueError(
                     "Hybrid search not available. Embedding service not initialized."
                 )
+
+            # Trigger lazy loading of reranking pipeline if reranking is requested
+            enable_reranking = kwargs.get('enable_reranking', False)
+            if enable_reranking:
+                # Access the property to trigger lazy loading
+                _ = self.reranking_pipeline
+
             return self.hybrid.search(
                 query=query,
                 filters=filters,
@@ -181,7 +208,7 @@ class SearchService:
                 keyword_top_k=kwargs.get('keyword_top_k'),
                 vector_top_k=kwargs.get('vector_top_k'),
                 # Step 10.2: Reranking parameters
-                enable_reranking=kwargs.get('enable_reranking', False),
+                enable_reranking=enable_reranking,
                 rerank_top_k=kwargs.get('rerank_top_k'),
                 enable_mmr=kwargs.get('enable_mmr'),
                 enable_dedup=kwargs.get('enable_dedup')

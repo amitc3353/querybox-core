@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     TRANSFORMERS_CACHE: str = os.path.expanduser("~/.cache/huggingface")
     HF_HOME: str = os.path.expanduser("~/.cache/huggingface")
 
+    # Query Embedding Caching (Performance Optimization)
+    EMBEDDING_CACHE_ENABLED: bool = True  # Enable Redis caching for query embeddings
+    EMBEDDING_CACHE_TTL_SECONDS: int = 1800  # 30 minutes TTL for cached embeddings
+
     # pgvector Configuration
     PGVECTOR_INDEX_TYPE: str = "hnsw"
     PGVECTOR_HNSW_M: int = 16

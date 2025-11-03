@@ -186,7 +186,56 @@ async def get_document_stats(
     return stats
 
 
-# 4. Get document search quality (/{document_id}/search-quality) - specific path with parameter
+# 4. Get document status (/{document_id}/status) - specific path with parameter
+@router.get(
+    "/{document_id}/status",
+    status_code=status.HTTP_200_OK,
+    summary="Get document processing status",
+    description="Get document processing status including extraction, chunking, and embedding status"
+)
+async def get_document_status(
+    document_id: str = Path(..., description="Document UUID", example="550e8400-e29b-41d4-a716-446655440000"),
+    service: DocumentService = Depends(get_document_service)
+):
+    """
+    Get document processing status
+
+    Returns the current processing status including:
+    - extraction_status
+    - chunking_status
+    - embedding_status
+    - Overall document metadata
+    """
+    logger.info(f"GET /documents/{document_id}/status")
+
+    # Validate UUID format
+    doc_uuid = validate_uuid(document_id)
+
+    # Get document from service
+    document_data = service.get_document_by_id(
+        document_id=doc_uuid,
+        include_processing_status=True,
+        track_access=False  # Don't increment access count for status checks
+    )
+
+    # Extract status information
+    return {
+        "document_id": str(document_data["id"]),
+        "document_name": document_data["document_name"],
+        "status": document_data["status"],
+        "extraction_status": document_data.get("processing_status", {}).get("extraction", {}).get("status", "not_started"),
+        "chunking_status": document_data.get("processing_status", {}).get("chunking", {}).get("status", "not_started"),
+        "embedding_status": document_data.get("processing_status", {}).get("embedding", {}).get("status", "not_started"),
+        "text_length": document_data.get("processing_status", {}).get("extraction", {}).get("text_length", 0),
+        "page_count": document_data.get("processing_status", {}).get("extraction", {}).get("page_count", 0),
+        "chunk_count": document_data.get("processing_status", {}).get("chunking", {}).get("chunk_count", 0),
+        "embedding_count": document_data.get("processing_status", {}).get("embedding", {}).get("embedding_count", 0),
+        "created_at": document_data["created_at"],
+        "updated_at": document_data["updated_at"]
+    }
+
+
+# 5. Get document search quality (/{document_id}/search-quality) - specific path with parameter
 @router.get(
     "/{document_id}/search-quality",
     status_code=status.HTTP_200_OK,
@@ -293,7 +342,7 @@ async def get_document_search_quality(
         )
 
 
-# 5. Get document by ID (/{document_id}) - generic path, must come after specific paths
+# 6. Get document by ID (/{document_id}) - generic path, must come after specific paths
 @router.get(
     "/{document_id}",
     response_model=DocumentResponse,
@@ -357,7 +406,7 @@ async def get_document(
     return document_data
 
 
-# 5. Delete document (/{document_id}) - DELETE method, order doesn't matter for different HTTP methods
+# 7. Delete document (/{document_id}) - DELETE method, order doesn't matter for different HTTP methods
 @router.delete(
     "/{document_id}",
     response_model=DocumentDeleteResponse,
