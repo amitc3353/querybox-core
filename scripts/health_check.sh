@@ -37,6 +37,23 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # ============================================================================
+# Signal Handling
+# ============================================================================
+
+# Flag to track if script should exit
+INTERRUPTED=false
+
+handle_interrupt() {
+    echo ""
+    log_warning "Health check interrupted by user"
+    INTERRUPTED=true
+    exit 130  # Standard exit code for SIGINT (128 + 2)
+}
+
+# Set up signal handlers
+trap handle_interrupt SIGINT SIGTERM
+
+# ============================================================================
 # Helper Functions
 # ============================================================================
 
@@ -167,6 +184,11 @@ wait_for_health() {
     echo ""
 
     while [ $elapsed -lt $TIMEOUT ]; do
+        # Check if interrupted
+        if [ "$INTERRUPTED" = true ]; then
+            return 130
+        fi
+
         log_info "Health check attempt #$attempt (${elapsed}/${TIMEOUT}s elapsed)"
         echo ""
 
@@ -181,7 +203,7 @@ wait_for_health() {
         # Wait before next check
         if [ $elapsed -lt $TIMEOUT ]; then
             log_info "Waiting ${INTERVAL}s before next check..."
-            sleep $INTERVAL
+            sleep $INTERVAL || return 130  # Exit if sleep interrupted
             elapsed=$((elapsed + INTERVAL))
             attempt=$((attempt + 1))
             echo ""

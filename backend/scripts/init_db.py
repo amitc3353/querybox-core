@@ -78,9 +78,16 @@ def check_database_connectivity() -> bool:
     """
     logger.info("Checking database connectivity...")
 
-    if not test_connection():
+    try:
+        if not test_connection():
+            logger.error("❌ Database connection failed!")
+            logger.error(f"   DATABASE_URL: {settings.DATABASE_URL}")
+            logger.error("   Verify database is running and credentials are correct.")
+            sys.exit(1)
+    except Exception as e:
         logger.error("❌ Database connection failed!")
         logger.error(f"   DATABASE_URL: {settings.DATABASE_URL}")
+        logger.error(f"   Error: {str(e)}")
         logger.error("   Verify database is running and credentials are correct.")
         sys.exit(1)
 
@@ -273,6 +280,7 @@ def main():
     logger.info("=" * 60)
     logger.info("✅ Database initialization complete!")
     logger.info("=" * 60)
+    sys.exit(0)
 
 
 if __name__ == "__main__":

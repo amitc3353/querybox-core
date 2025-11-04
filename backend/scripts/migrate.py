@@ -301,10 +301,10 @@ Examples:
     # Execute command
     try:
         if args.command == "upgrade":
-            upgrade_migrations(args.revision, args.dry_run)
+            upgrade_migrations(revision=args.revision, dry_run=args.dry_run)
 
         elif args.command == "downgrade":
-            downgrade_migrations(args.revision, args.dry_run)
+            downgrade_migrations(revision=args.revision, dry_run=args.dry_run)
 
         elif args.command == "history":
             show_history()
@@ -313,10 +313,10 @@ Examples:
             show_current()
 
         elif args.command == "dry-run":
-            upgrade_migrations("head", dry_run=True)
+            upgrade_migrations(revision="head", dry_run=True)
 
         elif args.command == "create":
-            create_new_migration(args.message, not args.no_autogenerate)
+            create_new_migration(message=args.message, autogenerate=not args.no_autogenerate)
 
     except Exception as e:
         logger.error(f"Command failed: {str(e)}")

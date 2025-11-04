@@ -2452,6 +2452,7 @@ class DemoDataSeeder:
 
                 if not doc:
                     self.logger.error("Document not found", document_id=str(doc_id))
+                    all_complete = False  # Document not found means processing incomplete
                     continue
 
                 # Query all processing status rows for this document
