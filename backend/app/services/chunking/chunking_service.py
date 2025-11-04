@@ -564,8 +564,8 @@ class ChunkingService:
             )
 
             contains_definition = any(
-                # Definitions store start_char and end_char for the term
-                not (defn.end_char < chunk_start or defn.start_char > chunk_end)
+                # Definitions store term text, check if term appears in chunk
+                defn.term.lower() in chunk_text.lower()
                 for defn in doc_structure.definitions
             )
 

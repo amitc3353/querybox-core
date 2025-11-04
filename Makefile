@@ -1,18 +1,24 @@
-.PHONY: help setup run migrate test clean docker-up docker-down install lint format
+.PHONY: help setup run migrate migration-create migration-history migration-current test clean docker-up docker-down install lint format seed-demo demo-setup health
 
 # Default target
 help:
 	@echo "QueryBox Core - Available commands:"
-	@echo "  setup        - Set up the development environment"
-	@echo "  install      - Install Python dependencies"
-	@echo "  run          - Start the FastAPI development server"
-	@echo "  migrate      - Run database migrations"
-	@echo "  test         - Run tests"
-	@echo "  lint         - Run linting (flake8, mypy)"
-	@echo "  format       - Format code (black, isort)"
-	@echo "  docker-up    - Start all services with Docker Compose"
-	@echo "  docker-down  - Stop all Docker services"
-	@echo "  clean        - Clean up cache and temporary files"
+	@echo "  setup              - Set up the development environment"
+	@echo "  install            - Install Python dependencies"
+	@echo "  run                - Start the FastAPI development server"
+	@echo "  migrate            - Run database migrations"
+	@echo "  migration-create   - Create new migration (auto-detect changes)"
+	@echo "  migration-history  - Show migration history"
+	@echo "  migration-current  - Show current migration version"
+	@echo "  test               - Run tests"
+	@echo "  lint               - Run linting (flake8, mypy)"
+	@echo "  format             - Format code (black, isort)"
+	@echo "  docker-up          - Start all services with Docker Compose"
+	@echo "  docker-down        - Stop all Docker services"
+	@echo "  seed-demo          - Seed demo data (5 sample documents)"
+	@echo "  demo-setup         - Full demo setup (Docker + migrations + seed)"
+	@echo "  health             - Check health status of all services"
+	@echo "  clean              - Clean up cache and temporary files"
 
 # Set up development environment
 setup: install docker-up migrate
@@ -32,11 +38,27 @@ run:
 # Run database migrations
 migrate:
 	@echo "🗄️  Running database migrations..."
-	cd backend && alembic upgrade head
+	cd backend && python scripts/migrate.py upgrade
 
-# Create new migration
+# Create new migration (auto-detect changes)
+migration-create:
+	@echo "📝 Creating new migration (auto-detect changes)..."
+	@read -p "Migration message: " msg; \
+	cd backend && python scripts/migrate.py create "$$msg"
+
+# Show migration history
+migration-history:
+	@echo "📜 Migration history:"
+	cd backend && python scripts/migrate.py history
+
+# Show current migration version
+migration-current:
+	@echo "🔍 Current migration version:"
+	cd backend && python scripts/migrate.py current
+
+# Legacy migration command (kept for backward compatibility)
 migration:
-	@echo "📝 Creating new migration..."
+	@echo "⚠️  Deprecated: Use 'make migration-create' instead"
 	@read -p "Migration message: " msg; \
 	cd backend && alembic revision --autogenerate -m "$$msg"
 
@@ -84,10 +106,38 @@ init-alembic:
 	@echo "🗄️  Initializing Alembic..."
 	cd backend && alembic init migrations
 
-# Seed demo data
+# Seed demo data (Step 12.3)
 seed-demo:
 	@echo "🌱 Seeding demo data..."
-	cd backend && python scripts/seed_demo.py
+	@echo "   - Generating 5 sample documents"
+	@echo "   - Uploading to QueryboxCore"
+	@echo "   - Waiting for processing (max 120s)"
+	@echo "   - Verifying search functionality"
+	@echo ""
+	python backend/scripts/seed_demo.py
+	@echo ""
+	@echo "✅ Demo data seeded successfully!"
+
+# Full demo environment setup (Step 12.3)
+demo-setup: docker-up migrate
+	@echo "⏳ Waiting for services to stabilize..."
+	@sleep 5
+	@echo "🌱 Seeding demo data..."
+	@make seed-demo
+	@echo ""
+	@echo "========================================"
+	@echo "✅ Demo Environment Ready!"
+	@echo "========================================"
+	@echo "API:    http://localhost:8000"
+	@echo "Docs:   http://localhost:8000/docs"
+	@echo "Health: http://localhost:8000/health"
+	@echo "MinIO:  http://localhost:9001"
+	@echo ""
+	@echo "Next steps:"
+	@echo "  1. Visit http://localhost:8000/docs for API documentation"
+	@echo "  2. Try: curl http://localhost:8000/api/v1/documents"
+	@echo "  3. Search: curl -X POST http://localhost:8000/api/v1/search -d '{\"query\":\"deployment\"}'"
+	@echo "========================================"
 
 # Check services health
 health:

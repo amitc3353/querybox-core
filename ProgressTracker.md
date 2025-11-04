@@ -1,24 +1,46 @@
 # Progress Tracker
 
-🚀 QueryBox Document Upload & Processing - Focused Execution Plan
+🚀 QueryboxCore - RAG Engine Development Progress
 
-## 📊 Current Status
-- **Week 1 Progress**: 40% Complete (2/5 days)
-- **Last Updated**: Day 2 Completed
-- **Next Up**: Day 3 - Storage Management
+## 📊 Current Status (December 2024)
+- **Current Phase**: Step 12 - Quick Wins & Demo Foundation
+- **Last Updated**: December 2024
+- **Next Milestone**: One-command deployment ready
 
 ### Quick Stats:
-- ✅ **Completed**: Day 1-2 (Infrastructure & Basic Upload)
-- 🏗️ **In Progress**: None
-- ⏳ **Pending**: Day 3-5 (Storage, Retrieval, Testing)
+- ✅ **Backend Complete**: Steps 1-11 (95% Complete)
+  - Full RAG pipeline operational
+  - Hybrid search with reranking
+  - Answer generation with verification
+  - 48 test files with good coverage
+- 🏗️ **In Progress**: Step 12 - Database migrations, Docker, demo data
+- ⏳ **Next Up**: Frontend development (Steps 13-14)
 
 ---
 
-📋 Core Focus Areas
-Priority 1: Document Upload Pipeline
-Complete file upload system with validation, storage, and metadata management
-Priority 2: Document Processing Engine
-Text extraction, chunking, and preparation for embedding generation
+## 📋 Strategic Priorities (Revised Dec 2024)
+**Priority 1: Demo Readiness** (Steps 12-14)
+- Remove deployment blockers
+- Build minimal frontend
+- Deploy public demo
+
+**Priority 2: User Feedback & Data Collection** (Step 15)
+- Get 10-20 pilot users
+- Monitor real usage patterns
+- Collect performance and quality data
+
+**Priority 3: Data-Driven Optimization** (Steps 16-18)
+- Optimize based on actual bottlenecks
+- Improve quality based on user feedback
+- Harden for production scale
+
+---
+
+## 🎯 Philosophy: Frontend-First, Then Optimize
+**Old Approach:** Backend perfection → Frontend → Demo
+**New Approach:** Demo-ready frontend → Users → Data-driven optimization
+
+This inversion ensures we optimize what matters based on real user data.
 
 📅 Week 1: Upload Foundation
 
@@ -129,46 +151,48 @@ Goal: Intelligent Chunking + Embeddings
 
  ## Step 9.3: Vector Similarity Search (2-3 days)
 
-  [ ] Implement vector-only search endpoint
-  [ ] Use cosine similarity with pgvector
-  [ ] Return top-k results with similarity scores
-  [ ] Test retrieval accuracy (measure recall@10)
-  [ ] Benchmark search latency (<200ms target)
+  [✅] Implement vector-only search endpoint
+  [✅] Use cosine similarity with pgvector
+  [✅] Return top-k results with similarity scores
+  [✅] Test retrieval accuracy (measure recall@10)
+  [✅] Benchmark search latency (<200ms target)
   Deliverable: Working semantic search (vector-only, >80% recall)
 
 ### Step 10 (Nov 18-24)
 Goal: Hybrid Retrieval + Reranking
 ## Step 10.1
-* [] BM25 + Vector fusion (RRF)
-* [] Implement 4-stage retrieval pipeline
-* [] Add metadata filtering
+* [✅] BM25 + Vector fusion (RRF)
+* [✅] Implement 4-stage retrieval pipeline
+* [✅] Add metadata filtering
 ## Step 10.2
 * [✅] Cross-encoder reranking (MiniLM-L6)
 * [✅] MMR for diversity
 * [✅] Result deduplication
 ## Step 10.3
-* [] Citation extraction from chunks
-* [] Source tracking and versioning
-* [] Performance optimization
+* [✅] Citation extraction from chunks
+* [✅] Source tracking and versioning
+* [✅] Performance optimization
 Deliverable: /search endpoint with citations, <500ms latency
 
-### Step 11 (Nov 25-Dec 1)
-Goal: Answer Generation with Verification
-## Step 11.1
-* [] LLM integration (GPT-4/Claude)
-* [] Claim generation from passages
-* [] Context window management
-* [] Proposition-based chunking (3-5 claims per chunk)
+### Step 11: Answer Generation with Verification
+  Goal: Generate verified answers with citations using local LLM
 
-## Step 11.2
-* [] Chain-of-Verification implementation
-* [] Self-questioning phase
-* [] Exact quote matching
-## Step 11.3
-* [✅] Abstention logic (can't answer = say so)
-* [✅] Confidence scoring
-* [✅] Citation formatting [1][2]
-Deliverable: /answer endpoint with verified citations
+  ## Step 11.1: Ollama LLM Integration
+    [✅] Set up Ollama with Qwen2-7B model
+    [✅] Create prompt templates for RAG
+    [✅] Context window management (max 8K tokens)
+    [✅] Proposition-based chunking (3-5 claims per chunk)
+
+  ## Step 11.2: Chain-of-Verification
+    [✅] Self-questioning verification phase
+    [✅] Exact quote matching against retrieved passages
+    [✅] Hallucination detection
+
+  ## Step 11.3: Citation & Confidence
+    [✅] Abstention logic (no answer → explicit statement)
+    [✅] Confidence scoring per claim
+    [✅] Citation formatting [1][2] with source links
+  Deliverable: POST /api/v1/answer endpoint with verified citations
 
 ## Step 11.4: Configurable Verification Profiles (Completed Dec 2024)
 * [✅] Create verification_profiles.py with 5 preset levels
@@ -190,111 +214,185 @@ Deliverable: /answer endpoint with verified citations
 Deliverable: Single VERIFICATION_LEVEL setting controls all verification parameters
 
 ### Step 12 (Dec 2-8)
-Goal: Speed & Scale Optimization
-## Step 12.1
-* [] Cascade retrieval system
-* [] Semantic cache (SimHash)
-* [] Hot tier indexing
-## Step 12.2
-* [] Query result caching
-* [] Batch processing optimization
-* [] Connection pooling
-## Step 12.3
-* [] Load testing (100 concurrent users)
-* [] Performance profiling
-* [] Database optimization
-Deliverable: P50 <100ms retrieval, handles 100k documents
+Goal: Quick Wins & Demo Foundation
+## Step 12.1: Database Automation
+* [] Set up Alembic migration framework
+* [] Generate initial migration from schema.sql
+* [] Add migration scripts (init_db.py, migrate.py)
+## Step 12.2: Deployment Infrastructure
+* [] Create backend/Dockerfile for FastAPI app
+* [] Create production docker-compose.yml (app + services)
+* [] Add deployment scripts (deploy.sh, health_check.sh)
+## Step 12.3: Demo Data Pipeline
+* [] Create seed_demo.py with 5-10 sample PDFs
+* [] Add sample queries JSON for testing
+* [] Pre-process demo documents for instant demo
+## Step 12.4: Progress Audit
+* [✅] Mark Step 10.1 (Hybrid search) as complete
+* [✅] Mark Step 10.3 (Citation extraction) as complete
+* [✅] Update documentation with current state
+Deliverable: One-command deployment (docker-compose up) with demo data
 
-### Step 13 (Dec 9-15)
-Goal: Accuracy & Quality Assurance
-## Step 13.1
-* [] Golden test set (200 Q&A pairs)
-* [] Groundedness validation
-* [] Hallucination detection
-## Step 13.2
-* [] Adversarial testing
-* [] Conflicting document handling
-* [] Temporal validation
-## Step 13.3
-* [] Accuracy metrics dashboard
-* [] Error analysis and fixes
-* [] Quality report generation
-Deliverable: >95% accuracy, <2% abstention rate
+### Step 13 (Dec 9-22)
+Goal: Frontend Development
+## Step 13.1: Next.js Foundation (Dec 9-12)
+* [] Initialize Next.js 14 with TypeScript + Tailwind
+* [] Set up API client for backend endpoints
+* [] Create base layout with navigation
+* [] Add environment configuration
+## Step 13.2: Document Upload UI (Dec 13-15)
+* [] Drag-and-drop upload interface
+* [] Upload progress indicators
+* [] Processing status display (extraction, embedding)
+* [] Document list view with metadata
+## Step 13.3: Search & Chat Interface (Dec 16-19)
+* [] Search bar with real-time results
+* [] Chat interface with message history
+* [] Streaming response display
+* [] Citation links and numbering [1][2]
+## Step 13.4: Citation & Sources (Dec 20-22)
+* [] Citation hover/click to view source text
+* [] Source highlighting in document viewer
+* [] Confidence indicators (STRONG/MEDIUM/WEAK)
+* [] Document reference panel
+Deliverable: Functional UI at localhost:3000 with upload → search → chat flow
 
-### Step 14 (Dec 16-22)
-Goal: Frontend & User Interface
-## Step 14.1
-* [] Next.js chat interface
-* [] Streaming responses
-* [] Citation hover/click
-## Step 14.2
-* [] Search UI with filters
-* [] Document viewer
-* [] Source highlighting
-## Step 14.3
-* [] Docker packaging
-* [] Environment configuration
-* [] Deployment scripts
-Deliverable: Complete UI + one-click Docker install
+### Step 14 (Dec 23-29)
+Goal: Demo Deployment
+## Step 14.1: Production Deployment
+* [] Deploy to Railway/Render/DigitalOcean
+* [] Configure production environment variables
+* [] Set up SSL/HTTPS with domain
+* [] Test end-to-end on production
+## Step 14.2: Landing Page & Onboarding
+* [] Create querybox.io landing page
+* [] Add /demo link with instructions
+* [] Implement waitlist/pilot signup form
+* [] Add usage documentation
+## Step 14.3: Monitoring & Observability
+* [] Set up Sentry for error tracking
+* [] Add analytics (Plausible/PostHog)
+* [] Create admin dashboard for metrics
+* [] Configure alerting for downtime
+Deliverable: Live demo at querybox.io/demo with 10-20 pilot users invited
 
-### Step 15 (Dec 23-31)
-Goal: Launch & Demo Ready
-## Step 15.1
-* [] Demo site deployment
-* [] Sample datasets (CA policies)
-* [] Performance tuning
-## Step 15.2
-* [] Documentation completion
-* [] API reference
-* [] Video demo recording
-## Step 15.3
-* [] Bug fixes from testing
-* [] Landing page live
-* [] Waitlist/pilot signup
-Deliverable: querybox.io/demo live with pilot-ready system
+### Step 15 (Dec 30-Jan 12)
+Goal: User Feedback & Discovery
+## Step 15.1: User Monitoring
+* [] Track query patterns and frequency
+* [] Monitor search latency (p50, p95, p99)
+* [] Log failed queries and errors
+* [] Record user feedback and feature requests
+## Step 15.2: Performance Profiling
+* [] Identify actual bottlenecks from logs
+* [] Profile slow queries (>500ms)
+* [] Measure embedding generation time
+* [] Track database query performance
+## Step 15.3: Quality Analysis
+* [] Collect queries where users report poor results
+* [] Analyze hallucination instances reported
+* [] Review citation accuracy feedback
+* [] Identify document types with extraction issues
+Deliverable: Data-driven insights report with prioritized optimization list
 
-🎯 Weekly Success Metrics
-Week	Must Complete	Success Metric
-1	Text extraction + search	Can search PDF content
-2	Embeddings + vectors	Semantic search works
-3	Hybrid retrieval	<500ms with citations
-4	Answer generation	Verified answers with sources
-5	Performance optimization	<100ms P50 latency
-6	Quality validation	>95% accuracy proven
-7	User interface	End-to-end demo flow
-8	Launch preparation	Public demo + pilots ready
-⚡ Daily Execution Pattern
-Morning (3-4 hours):
-* Core feature implementation
-* Test as you build
-Afternoon (2-3 hours):
-* Integration and debugging
-* Performance optimization
-Evening (1 hour):
-* Documentation
-* Plan next day
+### Step 16 (Jan 13-26)
+Goal: Data-Driven Performance Optimization
+## Step 16.1: Performance Fixes (Jan 13-16)
+* [] Optimize identified slow queries
+* [] Add caching for frequent user queries
+* [] Implement connection pooling improvements
+* [] Database index optimization (actual bottlenecks)
+## Step 16.2: Scale & Speed (Jan 17-20)
+* [] Add semantic cache (SimHash) for duplicate queries
+* [] Implement cascade retrieval if needed
+* [] Batch processing optimization for peak times
+* [] Hot tier indexing for popular documents
+## Step 16.3: Load Testing (Jan 21-26)
+* [] Load test with realistic user patterns
+* [] Test concurrent user limits (50-100 users)
+* [] Optimize for measured bottlenecks
+* [] Document performance characteristics
+Deliverable: P50 <200ms retrieval, handles measured user load
 
-🚨 Critical Checkpoints
-Week 2 End: If embeddings not working → Use simpler model Week 4 End: If accuracy <90% → Raise abstention thresholdWeek 6 End: If speed >200ms → Add more caching Week 7 End: If UI not ready → Focus on API-only launch
+### Step 17 (Jan 27-Feb 9)
+Goal: Data-Driven Quality Assurance
+## Step 17.1: Golden Test Set (Jan 27-30)
+* [] Build test set from REAL user queries (50-100 Q&A pairs)
+* [] Validate groundedness on reported issues
+* [] Test hallucination detection on edge cases
+* [] Measure accuracy improvements
+## Step 17.2: Adversarial Testing (Jan 31-Feb 3)
+* [] Test conflicting document scenarios users encountered
+* [] Validate temporal consistency issues
+* [] Test abstention logic on ambiguous queries
+* [] Handle edge cases from user reports
+## Step 17.3: Accuracy Dashboard (Feb 4-9)
+* [] Create accuracy metrics dashboard
+* [] Add error analysis tools
+* [] Generate quality reports
+* [] Implement continuous evaluation
+Deliverable: >95% accuracy on real user queries, <5% abstention rate
 
-💡 This Week's Immediate Focus
-Since you're starting Week 1 now:
-Today (Monday):
-1. Install pdfplumber
-2. Extract text from one PDF
-3. Save to database
-Tomorrow (Tuesday):
-1. Process 10 PDFs
-2. Handle edge cases
-3. Add metadata extraction
-Wednesday:
-1. Implement chunking
-2. Test chunk quality
-3. Store in chunks table
-By Friday:
-* Search endpoint working
-* Can find content in uploaded PDFs
-* Ready for embeddings next week
+### Step 18 (Feb 10-16)
+Goal: Scale & Production Hardening
+## Step 18.1: Advanced Features
+* [] Multi-document conversation context
+* [] Document version comparison
+* [] Advanced filtering and faceted search
+* [] Export and sharing capabilities
+## Step 18.2: Security & Compliance
+* [] Enhanced authentication (OAuth/SSO if needed)
+* [] Rate limiting and abuse prevention
+* [] Audit logging for enterprise
+* [] Data retention policies
+## Step 18.3: Launch Preparation
+* [] Complete API documentation
+* [] Create video demo
+* [] Write case studies from pilots
+* [] Prepare marketing materials
+Deliverable: Production-ready system, pilot success stories, launch-ready
+
+---
+
+## 🎯 Revised Roadmap Summary (Post Step 11)
+
+**Week 12 (Dec 2-8):** Quick wins & foundation → One-command deployment
+**Weeks 13-14 (Dec 9-22):** Frontend development → Working UI with chat
+**Week 15 (Dec 23-29):** Demo deployment → Live at querybox.io/demo
+**Week 16 (Dec 30-Jan 12):** User feedback → 10-20 pilot users, data collected
+**Weeks 17-18 (Jan 13-26):** Data-driven optimization → <200ms P50 based on real usage
+**Weeks 19-20 (Jan 27-Feb 9):** Quality assurance → >95% accuracy on user queries
+**Week 21+ (Feb 10+):** Production hardening → Enterprise-ready features
+
+⚡ **Daily Execution Pattern (Balanced Approach)**
+- Morning (3-4 hours): Core feature implementation
+- Afternoon (2-3 hours): Testing and debugging
+- Evening (1-2 hours): Code review and planning
+
+🚨 **Critical Checkpoints (Revised Strategy)**
+- **Week 1 End (Dec 8):** If Docker setup fails → Simplify to local-only first
+- **Week 3 End (Dec 22):** If frontend behind schedule → Deploy basic search UI only, skip chat
+- **Week 4 End (Dec 29):** If deployment issues → Use free tier Railway/Render, optimize later
+- **Week 5 End (Jan 12):** If no user traffic → Reach out to communities (Reddit, Discord, Twitter)
+- **Week 7 End (Jan 26):** If no clear bottlenecks → Skip premature optimization, focus on quality
+
+💡 **Current Phase: Post Step 11 - Demo Preparation**
+
+**Backend Status:** ✅ 95% Complete
+- Full RAG pipeline operational
+- Search, retrieval, answer generation working
+- Verification and confidence scoring implemented
+- 48 test files with good coverage
+
+**Next Immediate Actions (Step 12 - This Week):**
+1. **Database Migrations** (1-2 days) - Set up Alembic, generate initial migration
+2. **Deployment Package** (1 day) - Create backend Dockerfile, production docker-compose
+3. **Demo Data** (1 day) - Create seed script with sample PDFs, add sample queries
+
+**By End of Week:**
+- Run `docker-compose up` → Full system runs
+- Seed demo data → System has content
+- Ready to start frontend development
 
 
 <!-- ### Step 8: Upload Status Tracking (3 hours)

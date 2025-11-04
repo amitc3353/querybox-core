@@ -1,0 +1,62 @@
+[
+  {
+    "query": "How to configure the RAG pipeline?",
+    "expected_doc": "technical_guide.txt",
+    "description": "Configuration questions about RAG architecture",
+    "min_score": 0.7
+  },
+  {
+    "query": "What are the system requirements for deployment?",
+    "expected_doc": "deployment_guide.md",
+    "description": "Hardware and software prerequisites",
+    "min_score": 0.7
+  },
+  {
+    "query": "How do I upload documents via API?",
+    "expected_doc": "api_reference.html",
+    "description": "API endpoint usage for document upload",
+    "min_score": 0.7
+  },
+  {
+    "query": "What file types are supported?",
+    "expected_doc": "user_manual.txt",
+    "description": "Supported document formats",
+    "min_score": 0.7
+  },
+  {
+    "query": "How does Dense Passage Retrieval work?",
+    "expected_doc": "research_paper.txt",
+    "description": "Technical concepts from research paper",
+    "min_score": 0.7
+  },
+  {
+    "query": "What is the embedding generation process?",
+    "expected_doc": "technical_guide.txt",
+    "description": "Embedding and vector search details",
+    "min_score": 0.7
+  },
+  {
+    "query": "How to deploy with Docker Compose?",
+    "expected_doc": "deployment_guide.md",
+    "description": "Docker deployment instructions",
+    "min_score": 0.7
+  },
+  {
+    "query": "What are the API authentication methods?",
+    "expected_doc": "api_reference.html",
+    "description": "API security and authentication",
+    "min_score": 0.7
+  },
+  {
+    "query": "How to troubleshoot upload failures?",
+    "expected_doc": "user_manual.txt",
+    "description": "Common issues and solutions",
+    "min_score": 0.7
+  },
+  {
+    "query": "What is the dual-encoder architecture?",
+    "expected_doc": "research_paper.txt",
+    "description": "DPR methodology and architecture",
+    "min_score": 0.7
+  }
+]

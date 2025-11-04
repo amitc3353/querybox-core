@@ -1,0 +1,214 @@
+# Production Docker Compose Configuration
+# Step 12.2: Deployment Infrastructure
+# Includes backend service with optimized settings for production
+
+version: '3.8'
+
+services:
+  # ============================================================================
+  # Backend API Service
+  # ============================================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: querybox-backend:latest
+    container_name: querybox-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # Database
+      DATABASE_URL: postgresql://querybox:${POSTGRES_PASSWORD:-querybox_prod}@postgres:5432/querybox_core
+
+      # Redis
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+
+      # MinIO/S3
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      S3_BUCKET: querybox-documents
+      S3_REGION: us-east-1
+
+      # Application
+      ENVIRONMENT: production
+      LOG_LEVEL: info
+      API_KEY: ${API_KEY}
+      SECRET_KEY: ${SECRET_KEY}
+
+      # Model settings
+      EMBEDDING_MODEL: BAAI/bge-m3
+      CHUNK_SIZE: 1000
+      CHUNK_OVERLAP: 200
+
+      # OpenAI (optional)
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+
+      # Performance
+      WORKERS: ${WORKERS:-4}
+      MAX_UPLOAD_SIZE: 31457280  # 30MB
+
+    volumes:
+      - ./logs/backend:/app/logs
+      - ./storage:/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+    networks:
+      - querybox-network
+    labels:
+      - "querybox.service=backend"
+      - "querybox.environment=production"
+
+  # ============================================================================
+  # PostgreSQL Database with pgvector
+  # ============================================================================
+  postgres:
+    image: pgvector/pgvector:pg15
+    container_name: querybox-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: querybox
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-querybox_prod}
+      POSTGRES_DB: querybox_core
+      POSTGRES_INITDB_ARGS: "-E UTF8 --locale=en_US.UTF-8"
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./docker/postgres-init:/docker-entrypoint-initdb.d:ro
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U querybox -d querybox_core"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - querybox-network
+    labels:
+      - "querybox.service=database"
+      - "querybox.environment=production"
+
+  # ============================================================================
+  # Redis Cache & Queue
+  # ============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: querybox-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - querybox-network
+    labels:
+      - "querybox.service=cache"
+      - "querybox.environment=production"
+
+  # ============================================================================
+  # MinIO Object Storage
+  # ============================================================================
+  minio:
+    image: minio/minio:latest
+    container_name: querybox-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - querybox-network
+    labels:
+      - "querybox.service=storage"
+      - "querybox.environment=production"
+
+  # ============================================================================
+  # Celery Worker (for async processing)
+  # ============================================================================
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: querybox-backend:latest
+    container_name: querybox-celery-worker
+    restart: unless-stopped
+    command: celery -A app.worker worker --loglevel=info --concurrency=4
+    environment:
+      # Same environment as backend
+      DATABASE_URL: postgresql://querybox:${POSTGRES_PASSWORD:-querybox_prod}@postgres:5432/querybox_core
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      S3_BUCKET: querybox-documents
+      ENVIRONMENT: production
+      LOG_LEVEL: info
+      EMBEDDING_MODEL: BAAI/bge-m3
+    volumes:
+      - ./logs/celery:/app/logs
+      - ./storage:/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    networks:
+      - querybox-network
+    labels:
+      - "querybox.service=worker"
+      - "querybox.environment=production"
+
+# ============================================================================
+# Named Volumes for Data Persistence
+# ============================================================================
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  minio_data:
+    driver: local
+
+# ============================================================================
+# Network Configuration
+# ============================================================================
+networks:
+  querybox-network:
+    driver: bridge
+    name: querybox-prod-network
