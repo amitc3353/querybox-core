@@ -28,10 +28,10 @@ services:
       - querybox-network
 
   # ========================================
-  # PostgreSQL Database
+  # PostgreSQL Database with pgvector
   # ========================================
   postgres:
-    image: postgres:15-alpine
+    image: pgvector/pgvector:pg15
     container_name: querybox-postgres
     environment:
       POSTGRES_USER: querybox

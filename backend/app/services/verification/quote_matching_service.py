@@ -9,14 +9,14 @@ Based on technical documentation Section 10 (Code Snippets).
 from typing import List, Tuple
 from rapidfuzz import fuzz
 import tiktoken
-import logging
 
 from app.schemas.verification import QuoteMatch, Passage
 from app.utils.text_matching import extract_sentences, normalize_text
 from app.core.config import settings
+from app.core.logging import get_logger
 from app.core.verification_profiles import get_active_profile, VerificationProfile
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class QuoteMatchingService:

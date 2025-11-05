@@ -272,10 +272,13 @@ Deliverable: Single VERIFICATION_LEVEL setting controls all verification paramet
 
 ### Step 12 (Dec 2-8)
 Goal: Quick Wins & Demo Foundation
-## Step 12.1: Database Automation
-* [] Set up Alembic migration framework
-* [] Generate initial migration from schema.sql
-* [] Add migration scripts (init_db.py, migrate.py)
+## Step 12.1: Database Automation ✅ COMPLETE (Nov 5, 2025)
+* [✅] Set up Alembic migration framework
+* [✅] Fix database credentials (standardized to docker-compose.yml)
+* [✅] Install pgvector extension (switched to pgvector/pgvector:pg15 image)
+* [✅] Generate initial migration from models
+* [✅] Successfully run migration (6 tables created)
+* **Documentation**: See `dev/completed/step12-database-migration-fix.md`
 ## Step 12.2: Deployment Infrastructure
 * [] Create backend/Dockerfile for FastAPI app
 * [] Create production docker-compose.yml (app + services)
@@ -527,6 +530,49 @@ Goal: Enterprise-Grade Frontend Development (1-2 Week MVP)
 - Step 15: Multi-client white-labeling (themes, logos, feature toggles)
 - Step 16+: Real-time WebSocket, annotations, saved searches, export
 
+### Step 13.5 (Jan 5-6)
+Goal: Logging & Monitoring Infrastructure (Phase 1 - Development)
+
+**Context:**
+Before E2E testing, implement unified logging and monitoring to replace terminal-only log checking. Two-phase approach: Better Stack (immediate) + SigNoz + OTEL-Collector (production).
+
+**Dev Docs:** `dev/active/logging-monitoring/` (plan.md, context.md, tasks.md)
+
+## Step 13.5.1: Better Stack Integration (2 hours)
+* [ ] Sign up for Better Stack (Logtail) and get source token
+* [ ] Backend: Install logtail-python and configure structlog
+* [ ] Backend: Add middleware for multi-tenant labels (client_id, service, module)
+* [ ] Frontend: Install @logtail/browser and create logger wrapper
+* [ ] Frontend: Integrate with error boundary and API client
+* [ ] Celery: Add Logtail handler to worker logging
+* [ ] Test: Upload → Search → Chat flow with live-tail monitoring
+* [ ] Verify: All logs (frontend, backend, Celery) visible in Better Stack UI
+
+**Deliverable:**
+- ✅ Unified log viewing in Better Stack dashboard
+- ✅ Live-tail capability for real-time debugging
+- ✅ Searchable logs with filters (service, level, client_id, module)
+- ✅ Error detection with stack traces
+- ✅ Ready for E2E testing with comprehensive visibility
+
+**Success Criteria:**
+- All services (frontend, backend, Celery) logging to Better Stack
+- Can filter by client_id, service, module, error level
+- Live-tail works during testing (< 5 second latency)
+- Error logs include stack traces and context
+- Zero cost (3 GB/day free tier sufficient for development)
+
+**Architecture:**
+```
+┌─────────────┐
+│   FastAPI   │────┐
+│   Next.js   │────┼──▶ Better Stack Cloud
+│   Celery    │────┘     (Unified Dashboard)
+└─────────────┘
+```
+
+**Note:** Phase 2 (SigNoz + OTEL-Collector) scheduled for Step 16.4 (Production Deployment)
+
 ### Step 14 (Dec 23-29)
 Goal: End-to-End Testing & Live Demo (Safety Net for Step 15 Refactoring)
 
@@ -641,7 +687,48 @@ Goal: User Feedback & Discovery
 * [] Analyze hallucination instances reported
 * [] Review citation accuracy feedback
 * [] Identify document types with extraction issues
-Deliverable: Data-driven insights report with prioritized optimization list
+
+## Step 16.4: Production Observability Infrastructure (Phase 2 - 6-8 hours)
+**Context:** Self-hosted, production-grade logging and monitoring with vendor-agnostic architecture.
+
+**Dev Docs:** `dev/active/logging-monitoring/` (Phase 2 sections)
+
+**Tasks:**
+* [ ] Install OpenTelemetry Collector via Docker
+* [ ] Install SigNoz (self-hosted APM platform)
+* [ ] Configure otel-collector-config.yaml with processors for enrichment
+* [ ] Backend: Install OpenTelemetry Python SDK and auto-instrument FastAPI/Celery
+* [ ] Frontend: Install OpenTelemetry Web SDK and auto-instrument fetch/XHR
+* [ ] Implement multi-tenant label propagation (client_id, service, module)
+* [ ] Configure OTLP exporter to send telemetry to collector
+* [ ] Update docker-compose.yml with otel-collector service
+* [ ] Create service overview dashboard in SigNoz
+* [ ] Create per-client dashboard with client_id filters
+* [ ] Set up error rate and latency alerts (p95, p99)
+* [ ] Test distributed tracing: Next.js → FastAPI → Celery → LLM
+* [ ] Verify unlimited log retention and zero cost operation
+* [ ] Document switch from Better Stack to SigNoz
+
+**Architecture:**
+```
+┌─────────────┐     ┌──────────────┐     ┌──────────┐
+│   FastAPI   │────▶│              │────▶│          │
+│   Next.js   │     │ otel-        │     │  SigNoz  │
+│   Celery    │────▶│ collector    │────▶│ (self-   │
+│             │     │ (middleware) │     │ hosted)  │
+└─────────────┘     └──────────────┘     └──────────┘
+    Apps              Buffering/           Observability
+                      Enrichment           Backend
+```
+
+**Benefits:**
+- Vendor-agnostic: Can switch to Grafana/Honeycomb without changing app code
+- Unlimited logs with long retention (no 3-day limit)
+- Full control over data (privacy and compliance)
+- Production-grade APM, distributed traces, and metrics
+- Zero cost (completely self-hosted and open-source)
+
+Deliverable: Data-driven insights report with prioritized optimization list + Production observability platform
 
 ### Step 17 (Feb 3-16)
 Goal: Data-Driven Performance Optimization

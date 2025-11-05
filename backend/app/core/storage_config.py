@@ -173,6 +173,7 @@ class StorageSettings(BaseSettings):
         env_file = ".env"
         env_prefix = "STORAGE_"
         case_sensitive = True
+        extra = "ignore"  # Ignore extra environment variables not defined in Settings
         
         json_schema_extra = {
             "example": {

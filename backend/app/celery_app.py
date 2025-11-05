@@ -114,7 +114,12 @@ celery_app.conf.beat_schedule = {
 from celery.signals import task_prerun, task_postrun, task_failure, worker_process_init
 import logging
 
-logger = logging.getLogger(__name__)
+# Step 13.5 - Use Better Stack logging
+from app.core.logging import configure_logging, get_logger
+
+# Initialize logging for Celery
+configure_logging()
+logger = get_logger(__name__)
 
 
 @worker_process_init.connect
@@ -125,27 +130,77 @@ def configure_worker_process(**kwargs):
     This is CRITICAL for Apple Silicon - we must disable MPS in EACH worker
     process because environment variables set in the main process don't
     carry over to forked children.
+
+    Step 13.5 - Also configure logging for each worker process
     """
     import os
+    import structlog
+    from app.core.logging import configure_logging
+
+    # Disable MPS (Apple Silicon fix)
     os.environ['PYTORCH_ENABLE_MPS'] = '0'
     os.environ['PYTORCH_MPS_HIGH_WATERMARK_RATIO'] = '0.0'
     os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
-    logger.info("Worker process initialized with MPS disabled (Apple Silicon fix)")
+
+    # Configure logging for this worker process (Step 13.5)
+    configure_logging()
+
+    # Bind worker process context
+    worker_logger = get_logger(__name__)
+    worker_logger.info(
+        "Celery worker process initialized",
+        service="celery",
+        mps_disabled=True,
+        worker_pid=os.getpid()
+    )
 
 
 @task_prerun.connect
 def task_prerun_handler(sender=None, task_id=None, task=None, **kwargs):
-    """Log when task starts"""
-    logger.info(f"Task {task.name} [{task_id}] started")
+    """Log when task starts (Step 13.5 - with Better Stack)"""
+    import structlog
+
+    # Bind task context for all logs in this task
+    structlog.contextvars.bind_contextvars(
+        service="celery",
+        task_id=task_id,
+        task_name=task.name,
+        module=task.name.split('.')[2] if '.' in task.name else "unknown"
+    )
+
+    logger.info(
+        f"Celery task started: {task.name}",
+        task_id=task_id,
+        task_name=task.name
+    )
 
 
 @task_postrun.connect
 def task_postrun_handler(sender=None, task_id=None, task=None, retval=None, **kwargs):
-    """Log when task completes"""
-    logger.info(f"Task {task.name} [{task_id}] completed")
+    """Log when task completes (Step 13.5 - with Better Stack)"""
+    logger.info(
+        f"Celery task completed: {task.name}",
+        task_id=task_id,
+        task_name=task.name,
+        has_result=retval is not None
+    )
+
+    # Clear task context
+    import structlog
+    structlog.contextvars.clear_contextvars()
 
 
 @task_failure.connect
 def task_failure_handler(sender=None, task_id=None, exception=None, **kwargs):
-    """Log when task fails"""
-    logger.error(f"Task {sender.name} [{task_id}] failed: {exception}")
+    """Log when task fails (Step 13.5 - with Better Stack)"""
+    logger.error(
+        f"Celery task failed: {sender.name}",
+        task_id=task_id,
+        task_name=sender.name,
+        error_type=type(exception).__name__,
+        error_message=str(exception)
+    )
+
+    # Clear task context
+    import structlog
+    structlog.contextvars.clear_contextvars()

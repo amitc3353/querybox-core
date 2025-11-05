@@ -1,14 +1,15 @@
-from fastapi import FastAPI, Response
+from fastapi import FastAPI, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-import logging
+import structlog
 from app.core.config import settings
+from app.core.logging import configure_logging, get_logger
 from app.api.v1.router import api_router
 from app.middleware import PerformanceTrackingMiddleware
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Configure logging (Step 13.5 - Better Stack integration)
+configure_logging()
+logger = get_logger(__name__)
 
 
 @asynccontextmanager
@@ -58,6 +59,54 @@ app.add_middleware(
     track_request_body=True,
     track_response_body=True
 )
+
+
+# Middleware for logging context (Step 13.5 - Multi-tenant labels)
+@app.middleware("http")
+async def add_logging_context(request: Request, call_next):
+    """
+    Extract client_id from request and add to logging context.
+
+    This enables filtering logs by client in Better Stack:
+    - client_id: From X-Client-ID header or "default"
+    - service: "backend" (added by logging config)
+    - module: From URL path (e.g., "documents", "search", "answer")
+    - request_id: From X-Request-ID header or generated
+    """
+    import uuid
+
+    # Extract client ID from header or use default
+    client_id = request.headers.get("X-Client-ID", "default")
+
+    # Extract request ID or generate one
+    request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+
+    # Extract module from URL path (e.g., /api/v1/documents -> "documents")
+    path_parts = request.url.path.strip("/").split("/")
+    module = path_parts[2] if len(path_parts) > 2 else "root"
+
+    # Bind context variables to all logs in this request
+    structlog.contextvars.bind_contextvars(
+        client_id=client_id,
+        request_id=request_id,
+        module=module,
+        method=request.method,
+        path=request.url.path,
+    )
+
+    try:
+        response = await call_next(request)
+
+        # Log request completion
+        logger.info(
+            "Request completed",
+            status_code=response.status_code,
+        )
+
+        return response
+    finally:
+        # Clear context variables after request
+        structlog.contextvars.clear_contextvars()
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
 

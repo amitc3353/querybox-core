@@ -7,7 +7,6 @@ and quote coverage.
 Implements Stage 5 of verification pipeline.
 """
 from typing import List, Dict
-import logging
 
 from app.schemas.verification import (
     HallucinationReport,
@@ -16,9 +15,10 @@ from app.schemas.verification import (
 )
 from app.schemas.answer import Proposition
 from app.utils.text_matching import normalize_text, calculate_word_overlap
+from app.core.logging import get_logger
 from app.core.verification_profiles import get_active_profile, VerificationProfile
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class HallucinationDetector:

@@ -6,13 +6,13 @@ Generates verification questions from propositions to verify claims independentl
 Implements Stage 2 of verification pipeline.
 """
 from typing import List
-import logging
 from uuid import uuid4
 
 from app.schemas.verification import VerificationQuestion
 from app.schemas.answer import Proposition
+from app.core.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class VerificationQuestionGenerator:

@@ -15,7 +15,6 @@ Implements:
 import asyncio
 import hashlib
 import json
-import logging
 import time
 from typing import Dict, List, Optional
 from datetime import datetime
@@ -39,10 +38,11 @@ from app.schemas.verification import (
     Passage
 )
 from app.core.config import settings
+from app.core.logging import get_logger
 from app.core.metrics import VerificationMetricsRecorder
 from app.core.verification_profiles import get_active_profile, VerificationProfile
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class VerificationService:
@@ -141,11 +141,9 @@ class VerificationService:
 
         logger.info(
             "Starting verification pipeline",
-            extra={
-                "request_id": request_id,
-                "query_length": len(request.query),
-                "enable_verification": enable_verification
-            }
+            request_id=request_id,
+            query_length=len(request.query),
+            enable_verification=enable_verification
         )
 
         # Check cache (L1: Verification results)
@@ -153,7 +151,7 @@ class VerificationService:
             cache_key = self._generate_verification_cache_key(request, enable_verification)
             cached_result = await self._get_from_cache(cache_key)
             if cached_result:
-                logger.info("Verification cache hit", extra={"request_id": request_id})
+                logger.info("Verification cache hit", request_id=request_id)
                 VerificationMetricsRecorder.record_cache_hit("l1_verification")
                 cached_result.cache_hit = True
                 VerificationMetricsRecorder.decrement_concurrent_requests()
@@ -225,12 +223,10 @@ class VerificationService:
 
                 logger.info(
                     "Verification completed",
-                    extra={
-                        "request_id": request_id,
-                        "status": verified_response.verification_metadata.status,
-                        "hallucination_probability": verified_response.verification_metadata.hallucination_probability,
-                        "latency_ms": elapsed_ms
-                    }
+                    request_id=request_id,
+                    status=verified_response.verification_metadata.status,
+                    hallucination_probability=verified_response.verification_metadata.hallucination_probability,
+                    latency_ms=elapsed_ms
                 )
 
                 return verified_response
@@ -238,7 +234,8 @@ class VerificationService:
             except asyncio.TimeoutError:
                 logger.error(
                     "Verification timeout",
-                    extra={"request_id": request_id, "timeout": self.VERIFICATION_TIMEOUT_SECONDS}
+                    request_id=request_id,
+                    timeout=self.VERIFICATION_TIMEOUT_SECONDS
                 )
                 VerificationMetricsRecorder.record_timeout("overall")
                 return self._fallback_to_baseline(baseline_answer, "timeout")
@@ -246,7 +243,8 @@ class VerificationService:
         except Exception as e:
             logger.error(
                 "Verification failed",
-                extra={"request_id": request_id, "error": str(e)},
+                request_id=request_id,
+                error=str(e),
                 exc_info=True
             )
             VerificationMetricsRecorder.record_verification_error("pipeline", type(e).__name__)
@@ -286,10 +284,8 @@ class VerificationService:
 
         logger.info(
             "Generated verification questions",
-            extra={
-                "request_id": request_id,
-                "question_count": len(verification_questions)
-            }
+            request_id=request_id,
+            question_count=len(verification_questions)
         )
 
         # Stage 3 & 4: Execute in parallel
@@ -313,10 +309,8 @@ class VerificationService:
 
         logger.info(
             "Quote matching completed",
-            extra={
-                "request_id": request_id,
-                "propositions_with_quotes": sum(1 for matches in quote_matches.values() if matches)
-            }
+            request_id=request_id,
+            propositions_with_quotes=sum(1 for matches in quote_matches.values() if matches)
         )
 
         # Stage 5: Detect hallucinations
@@ -330,11 +324,9 @@ class VerificationService:
         if hallucination_report.hallucination_probability > 0.3:
             logger.warning(
                 "High hallucination probability detected",
-                extra={
-                    "request_id": request_id,
-                    "probability": hallucination_report.hallucination_probability,
-                    "flagged_count": len(hallucination_report.flagged_proposition_indices)
-                }
+                request_id=request_id,
+                probability=hallucination_report.hallucination_probability,
+                flagged_count=len(hallucination_report.flagged_proposition_indices)
             )
 
         # Stage 6: Build verified response
@@ -375,7 +367,7 @@ class VerificationService:
             cache_key = self._generate_question_cache_key(propositions)
             cached_questions = await self._get_questions_from_cache(cache_key)
             if cached_questions:
-                logger.info("Verification questions cache hit", extra={"request_id": request_id})
+                logger.info("Verification questions cache hit", request_id=request_id)
                 VerificationMetricsRecorder.record_cache_hit("l3_questions")
                 return cached_questions
             else:
@@ -394,7 +386,7 @@ class VerificationService:
         except Exception as e:
             logger.error(
                 f"Question generation failed: {e}",
-                extra={"request_id": request_id},
+                request_id=request_id,
                 exc_info=True
             )
             # Fallback to template-based questions
@@ -422,7 +414,7 @@ class VerificationService:
         """
         logger.info(
             f"Executing {len(questions)} verification questions in parallel",
-            extra={"request_id": request_id}
+            request_id=request_id
         )
 
         # Build context from passages (WITHOUT baseline answer - critical!)
@@ -441,7 +433,7 @@ class VerificationService:
         if fallback_count > 0:
             logger.warning(
                 f"{fallback_count}/{len(questions)} verification questions used fallback",
-                extra={"request_id": request_id}
+                request_id=request_id
             )
 
         return verification_answers
@@ -493,14 +485,16 @@ class VerificationService:
         except asyncio.TimeoutError:
             logger.error(
                 f"Verification question timeout: {question.id}",
-                extra={"request_id": request_id, "question_preview": question.question_text[:50]}
+                request_id=request_id,
+                question_preview=question.question_text[:50]
             )
             return self._create_fallback_answer(question, "timeout")
 
         except Exception as e:
             logger.error(
                 f"Verification question failed: {e}",
-                extra={"request_id": request_id, "question_id": question.id}
+                request_id=request_id,
+                question_id=question.id
             )
             return self._create_fallback_answer(question, f"error: {str(e)}")
 
@@ -586,7 +580,7 @@ ANSWER:"""
         """
         logger.info(
             f"Starting quote matching for {len(propositions)} propositions",
-            extra={"request_id": request_id}
+            request_id=request_id
         )
 
         # Run quote matching in parallel
@@ -626,7 +620,7 @@ ANSWER:"""
             if isinstance(result, Exception):
                 logger.warning(
                     f"Quote matching failed for proposition {prop.index}: {result}",
-                    extra={"request_id": request_id}
+                    request_id=request_id
                 )
                 VerificationMetricsRecorder.record_verification_error("quote_matching", type(result).__name__)
                 quote_matches[prop.index] = []

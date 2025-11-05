@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from pydantic import ConfigDict
 from typing import List, Optional
 import os
 
@@ -251,8 +252,17 @@ class Settings(BaseSettings):
     LOG_VERIFICATION_RESULTS: bool = True
     TRACK_HALLUCINATION_TRENDS: bool = True
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    # ========================================
+    # Better Stack (Logtail) Logging Configuration (Step 13.5)
+    # ========================================
+    LOGTAIL_SOURCE_TOKEN: Optional[str] = None
+    LOGTAIL_ENABLED: bool = True
+    LOG_LEVEL: str = "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+
+    model_config = ConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore"  # Ignore extra environment variables not defined in Settings
+    )
 
 settings = Settings()

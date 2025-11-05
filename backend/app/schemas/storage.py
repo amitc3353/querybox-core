@@ -29,6 +29,7 @@ class StorageProviderType(str, Enum):
     """Supported storage provider types"""
     LOCAL = "local"
     S3 = "s3"
+    MINIO = "minio"  # MinIO (S3-compatible)
     AZURE_BLOB = "azure_blob"
 
 
