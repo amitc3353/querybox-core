@@ -14,25 +14,82 @@
   - Answer generation with verification
   - 48 test files with good coverage
 - 🏗️ **In Progress**: Step 12 - Database migrations, Docker, demo data
-- ⏳ **Next Up**: Frontend development (Steps 13-14)
+- ⏳ **Next Up**: Claude Code infrastructure (Step 12.5), Frontend (Step 13), E2E Testing (Step 14)
+- 🔮 **Future**: Modular architecture refactoring (Step 15 - after UI complete)
+
+---
+
+## 🎯 QueryBox Modular Vision (Post-UI Implementation)
+
+**Goal**: Transform QueryBox into a modular, configurable AI document intelligence platform where components (parsers, embedders, retrievers, LLMs) can be swapped per client without rewriting core logic.
+
+### Modular Components (Step 15)
+
+| Component | Default (Current) | Alternatives (Planned) |
+|-----------|-------------------|------------------------|
+| **Parsers** | PyMuPDF | Docling, Unstructured.io, Custom |
+| **Embedders** | BGE-M3 (local) | OpenAI ada-002, Cohere, Custom |
+| **Retrievers** | Hybrid (BM25+Vector) | Pure Vector, Pure BM25, Custom |
+| **LLMs** | Ollama (local) | OpenAI GPT, Anthropic Claude, OpenRouter |
+
+### Implementation Strategy
+
+1. ✅ **Build working system with defaults** (Steps 1-12) - DONE
+   - Backend fully operational
+   - Defaults: PyMuPDF, BGE-M3, Hybrid retrieval, Ollama
+
+2. 🏗️ **Build UI and E2E tests** (Steps 13-14) - IN PROGRESS
+   - Frontend with upload → search → chat flow
+   - Comprehensive E2E test coverage
+   - Live demo deployment
+
+3. 🔮 **Refactor to modular architecture** (Step 15) - PLANNED
+   - Base classes for all components
+   - Provider registry pattern
+   - Configuration system (YAML + database)
+   - Multiple provider implementations
+
+4. 🔮 **Per-client customization** (Step 15.3) - PLANNED
+   - Client configuration API
+   - Admin UI for configuration
+   - Deployment profiles (SaaS, On-Prem, Hybrid)
+
+### Why This Order?
+
+**E2E tests provide safety net for refactoring:**
+- Step 14 creates comprehensive test coverage
+- Can confidently refactor in Step 15 knowing tests will catch regressions
+- Live demo validates current functionality before changes
+- Backward compatible - existing deployments unaffected
+
+**Benefits:**
+- 🔒 **Safe refactoring**: E2E tests catch any breaking changes
+- 🎯 **Client flexibility**: Swap components via config, not code
+- 📦 **Easy extension**: Add new providers without touching core
+- 🔄 **Backward compatible**: Defaults preserve current behavior
 
 ---
 
 ## 📋 Strategic Priorities (Revised Dec 2024)
 **Priority 1: Demo Readiness** (Steps 12-14)
-- Remove deployment blockers
-- Build minimal frontend
-- Deploy public demo
+- Step 12.5: Claude Code infrastructure (productivity boost)
+- Step 13: Build frontend with upload → search → chat
+- Step 14: E2E tests + live demo deployment
 
-**Priority 2: User Feedback & Data Collection** (Step 15)
-- Get 10-20 pilot users
-- Monitor real usage patterns
-- Collect performance and quality data
+**Priority 2: Modular Architecture** (Step 15)
+- Refactor to base classes + registry pattern
+- Implement multiple providers per component
+- Client configuration system
 
-**Priority 3: Data-Driven Optimization** (Steps 16-18)
-- Optimize based on actual bottlenecks
-- Improve quality based on user feedback
-- Harden for production scale
+**Priority 3: User Feedback & Optimization** (Steps 16-18)
+- Step 16: Collect usage data from pilots
+- Step 17: Data-driven performance optimization
+- Step 18: Quality assurance based on real queries
+
+**Priority 4: Production Hardening** (Step 19)
+- Advanced features and enterprise requirements
+- Security, compliance, and scalability
+- Launch preparation with case studies
 
 ---
 
@@ -233,6 +290,32 @@ Goal: Quick Wins & Demo Foundation
 * [✅] Update documentation with current state
 Deliverable: One-command deployment (docker-compose up) with demo data
 
+## Step 12.5: Claude Code Development Infrastructure (Dec 5-6) - LIGHTWEIGHT
+Goal: Essential productivity tools for faster UI development (Step 13)
+
+## Step 12.5.1: Core Setup (2 hours) ✅ COMPLETE
+* [✅] Streamline CLAUDE.md to ~150 lines (project-specific only)
+* [✅] Create .claude/ directory structure (skills, hooks, agents, commands)
+* [✅] Implement skill-activation-prompt.ts hook (auto-activate skills)
+* [✅] Implement post-tool-use-tracker.sh hook (track file edits)
+* [✅] Set up dev/active/ directory for dev docs system
+
+## Step 12.5.2: Essential Skills (1 hour) ✅ COMPLETE
+* [✅] Create skill-rules.json for auto-activation configuration
+* [✅] Create python-fastapi-dev skill (basic FastAPI/Pydantic patterns)
+* [✅] Create testing-patterns skill (pytest patterns and best practices)
+
+## Step 12.5.3: Workflow Commands (1 hour) ✅ COMPLETE
+* [✅] Create /dev-docs slash command (generate plan/context/tasks)
+* [✅] Create /dev-docs-update slash command (update before compaction)
+* [✅] Create /test-all slash command (run full pytest suite)
+
+Deliverable: 2-3x productivity boost for UI development. Skills auto-activate, dev docs survive context resets, faster feature implementation.
+Time: 3-4 hours (minimal, focused on immediate value)
+Note: Heavy modular architecture work moved to Step 15 (after UI + E2E tests complete)
+
+**Step 12.5 COMPLETE** ✅ Claude Code infrastructure fully operational!
+
 ### Step 13 (Dec 9-22)
 Goal: Frontend Development
 ## Step 13.1: Next.js Foundation (Dec 9-12)
@@ -258,94 +341,172 @@ Goal: Frontend Development
 Deliverable: Functional UI at localhost:3000 with upload → search → chat flow
 
 ### Step 14 (Dec 23-29)
-Goal: Demo Deployment
-## Step 14.1: Production Deployment
-* [] Deploy to Railway/Render/DigitalOcean
-* [] Configure production environment variables
-* [] Set up SSL/HTTPS with domain
-* [] Test end-to-end on production
-## Step 14.2: Landing Page & Onboarding
-* [] Create querybox.io landing page
-* [] Add /demo link with instructions
-* [] Implement waitlist/pilot signup form
-* [] Add usage documentation
-## Step 14.3: Monitoring & Observability
-* [] Set up Sentry for error tracking
-* [] Add analytics (Plausible/PostHog)
-* [] Create admin dashboard for metrics
-* [] Configure alerting for downtime
-Deliverable: Live demo at querybox.io/demo with 10-20 pilot users invited
+Goal: End-to-End Testing & Live Demo (Safety Net for Step 15 Refactoring)
 
-### Step 15 (Dec 30-Jan 12)
+## Step 14.1: End-to-End Test Suite (3 days)
+* [] E2E test: Upload PDF → Extract → Chunk → Embed → Search
+* [] E2E test: Upload → Ask Question → Get Answer with Citations
+* [] E2E test: Multiple document types (PDF, DOCX, TXT, MD)
+* [] E2E test: Error handling and recovery flows
+* [] E2E test: Concurrent user scenarios (5-10 simultaneous users)
+* [] Golden dataset: 20-30 sample documents with expected results
+* [] Test automation: Script to run full E2E suite on demand
+* [] Performance benchmarks: Search latency, answer generation time
+Deliverable: Comprehensive E2E test coverage that validates entire pipeline
+
+## Step 14.2: Demo Deployment (2 days)
+* [] Deploy to Railway/Render/DigitalOcean (choose platform)
+* [] Configure production environment variables
+* [] Set up SSL/HTTPS with custom domain (querybox.io)
+* [] Test full deployment end-to-end (upload → search → chat)
+* [] Create demo user accounts with sample data
+* [] Set up monitoring (Sentry for errors, analytics for usage)
+Deliverable: Live demo accessible at querybox.io/demo
+
+## Step 14.3: Documentation & Video (2 days)
+* [] Seed production with diverse demo documents
+* [] Record video walkthrough (5-7 minutes, upload → search → chat)
+* [] Write user guide (getting started, best practices)
+* [] Create troubleshooting guide (common issues)
+* [] Set up health monitoring and alerting
+Deliverable: Public demo with documentation, ready for user testing
+
+**Why This Step is Critical:**
+- ✅ E2E tests become safety net for Step 15 modular refactoring
+- ✅ Live demo validates system works end-to-end before big changes
+- ✅ Can confidently refactor knowing tests will catch regressions
+- ✅ Provides baseline performance metrics to maintain during refactoring
+
+### Step 15 (Dec 30 - Jan 19)
+Goal: Modular Architecture Refactoring (Transform into Configurable Platform)
+
+**Context:** Backend complete (Steps 1-12), Frontend complete (Step 13), E2E tests provide safety net (Step 14). Can now refactor with confidence.
+
+**Vision:** Modular platform where components (parsers, embedders, retrievers, LLMs) are swappable per client via configuration, not code changes.
+
+## Step 15.1: Modular Architecture Foundation (Week 1: Dec 30 - Jan 5, 12-16 hours)
+* [] Create base classes (BaseParser, BaseEmbedder, BaseRetriever, BaseLLM)
+* [] Implement provider registry pattern (ProviderRegistry class)
+* [] Build configuration system (YAML defaults + database overrides)
+* [] Create provider factory with instance caching
+* [] Add client_configs database table (Alembic migration)
+* [] Refactor existing services to implement base classes:
+  - BGEEmbedder → implements BaseEmbedder
+  - PyMuPDFParser → implements BaseParser
+  - HybridRetriever → implements BaseRetriever
+  - OllamaService → implements BaseLLM
+* [] **Run E2E tests after each refactor** - ensure zero regressions
+* [] Update ARCHITECTURE.md with modular design patterns
+* [] Update PROJECT.md with configuration examples
+Deliverable: Modular foundation in place, existing functionality unchanged, E2E tests passing
+
+## Step 15.2: Multi-Provider Implementation (Week 2: Jan 6-12, 12-16 hours)
+* [] Implement OpenAIEmbedder (BaseEmbedder) with API integration
+* [] Implement CohereEmbedder (BaseEmbedder) with API integration
+* [] Implement DoclingParser (BaseParser) for advanced PDF layout
+* [] Implement UnstructuredParser (BaseParser) for universal document types
+* [] Implement OpenAILLM (BaseLLM) with streaming support
+* [] Implement AnthropicLLM (BaseLLM) with Claude integration
+* [] Register all providers in config/providers.yaml
+* [] **Run E2E tests with each provider** - validate swappability works
+* [] Create provider comparison benchmarks (speed, quality, cost)
+* [] Document each provider (capabilities, configuration, limitations)
+Deliverable: 2-3 options per component, all tested and documented
+
+## Step 15.3: Client Configuration System (Week 3: Jan 13-19, 8-12 hours)
+* [] Implement configuration API endpoints:
+  - GET /api/v1/clients/{id}/config (read config)
+  - PUT /api/v1/clients/{id}/config (update config)
+  - GET /api/v1/providers (list available providers)
+* [] Build admin UI for client configuration:
+  - Client list view
+  - Configuration editor with provider dropdowns
+  - Provider testing/validation tools
+  - Configuration profiles (SaaS, On-Prem, Hybrid)
+* [] Add configuration validation (API keys present, models available)
+* [] Create configuration guide with examples
+* [] Write migration guide for existing deployments
+* [] **Final E2E test sweep** - all providers, all configurations
+* [] Verify backward compatibility - default config = current behavior
+Deliverable: Fully configurable platform, per-client customization, admin UI complete
+
+**Success Criteria:**
+- ✅ All E2E tests pass with every provider combination
+- ✅ Can switch embedder via config (no code changes)
+- ✅ Existing demo continues working (backward compatible)
+- ✅ Documentation complete for adding custom providers
+- ✅ 3+ providers per component category available
+
+### Step 16 (Jan 20 - Feb 2)
 Goal: User Feedback & Discovery
-## Step 15.1: User Monitoring
+## Step 16.1: User Monitoring
 * [] Track query patterns and frequency
 * [] Monitor search latency (p50, p95, p99)
 * [] Log failed queries and errors
 * [] Record user feedback and feature requests
-## Step 15.2: Performance Profiling
+## Step 16.2: Performance Profiling
 * [] Identify actual bottlenecks from logs
 * [] Profile slow queries (>500ms)
 * [] Measure embedding generation time
 * [] Track database query performance
-## Step 15.3: Quality Analysis
+## Step 16.3: Quality Analysis
 * [] Collect queries where users report poor results
 * [] Analyze hallucination instances reported
 * [] Review citation accuracy feedback
 * [] Identify document types with extraction issues
 Deliverable: Data-driven insights report with prioritized optimization list
 
-### Step 16 (Jan 13-26)
+### Step 17 (Feb 3-16)
 Goal: Data-Driven Performance Optimization
-## Step 16.1: Performance Fixes (Jan 13-16)
+## Step 17.1: Performance Fixes (Feb 3-6)
 * [] Optimize identified slow queries
 * [] Add caching for frequent user queries
 * [] Implement connection pooling improvements
 * [] Database index optimization (actual bottlenecks)
-## Step 16.2: Scale & Speed (Jan 17-20)
+## Step 17.2: Scale & Speed (Feb 7-10)
 * [] Add semantic cache (SimHash) for duplicate queries
 * [] Implement cascade retrieval if needed
 * [] Batch processing optimization for peak times
 * [] Hot tier indexing for popular documents
-## Step 16.3: Load Testing (Jan 21-26)
+## Step 17.3: Load Testing (Feb 11-16)
 * [] Load test with realistic user patterns
 * [] Test concurrent user limits (50-100 users)
 * [] Optimize for measured bottlenecks
 * [] Document performance characteristics
 Deliverable: P50 <200ms retrieval, handles measured user load
 
-### Step 17 (Jan 27-Feb 9)
+### Step 18 (Feb 17 - Mar 2)
 Goal: Data-Driven Quality Assurance
-## Step 17.1: Golden Test Set (Jan 27-30)
+## Step 18.1: Golden Test Set (Feb 17-20)
 * [] Build test set from REAL user queries (50-100 Q&A pairs)
 * [] Validate groundedness on reported issues
 * [] Test hallucination detection on edge cases
 * [] Measure accuracy improvements
-## Step 17.2: Adversarial Testing (Jan 31-Feb 3)
+## Step 18.2: Adversarial Testing (Feb 21-24)
 * [] Test conflicting document scenarios users encountered
 * [] Validate temporal consistency issues
 * [] Test abstention logic on ambiguous queries
 * [] Handle edge cases from user reports
-## Step 17.3: Accuracy Dashboard (Feb 4-9)
+## Step 18.3: Accuracy Dashboard (Feb 25 - Mar 2)
 * [] Create accuracy metrics dashboard
 * [] Add error analysis tools
 * [] Generate quality reports
 * [] Implement continuous evaluation
 Deliverable: >95% accuracy on real user queries, <5% abstention rate
 
-### Step 18 (Feb 10-16)
+### Step 19 (Mar 3-16)
 Goal: Scale & Production Hardening
-## Step 18.1: Advanced Features
+## Step 19.1: Advanced Features
 * [] Multi-document conversation context
 * [] Document version comparison
 * [] Advanced filtering and faceted search
 * [] Export and sharing capabilities
-## Step 18.2: Security & Compliance
+## Step 19.2: Security & Compliance
 * [] Enhanced authentication (OAuth/SSO if needed)
 * [] Rate limiting and abuse prevention
 * [] Audit logging for enterprise
 * [] Data retention policies
-## Step 18.3: Launch Preparation
+## Step 19.3: Launch Preparation
 * [] Complete API documentation
 * [] Create video demo
 * [] Write case studies from pilots
@@ -354,15 +515,17 @@ Deliverable: Production-ready system, pilot success stories, launch-ready
 
 ---
 
-## 🎯 Revised Roadmap Summary (Post Step 11)
+## 🎯 Revised Roadmap Summary (Post Step 12)
 
 **Week 12 (Dec 2-8):** Quick wins & foundation → One-command deployment
+**Week 12.5 (Dec 5-6):** Claude Code infrastructure → 2-3x productivity boost
 **Weeks 13-14 (Dec 9-22):** Frontend development → Working UI with chat
-**Week 15 (Dec 23-29):** Demo deployment → Live at querybox.io/demo
-**Week 16 (Dec 30-Jan 12):** User feedback → 10-20 pilot users, data collected
-**Weeks 17-18 (Jan 13-26):** Data-driven optimization → <200ms P50 based on real usage
-**Weeks 19-20 (Jan 27-Feb 9):** Quality assurance → >95% accuracy on user queries
-**Week 21+ (Feb 10+):** Production hardening → Enterprise-ready features
+**Week 15 (Dec 23-29):** E2E Testing & Demo → Live at querybox.io/demo with test coverage
+**Weeks 16-18 (Dec 30-Jan 19):** Modular Architecture → Configurable, extensible platform
+**Week 19 (Jan 20-Feb 2):** User feedback → Pilot users, usage data collection
+**Weeks 20-21 (Feb 3-16):** Data-driven optimization → <200ms P50, measured bottlenecks
+**Weeks 22-23 (Feb 17-Mar 2):** Quality assurance → >95% accuracy on real user queries
+**Week 24+ (Mar 3+):** Production hardening → Enterprise-ready, launch preparation
 
 ⚡ **Daily Execution Pattern (Balanced Approach)**
 - Morning (3-4 hours): Core feature implementation
@@ -370,11 +533,12 @@ Deliverable: Production-ready system, pilot success stories, launch-ready
 - Evening (1-2 hours): Code review and planning
 
 🚨 **Critical Checkpoints (Revised Strategy)**
-- **Week 1 End (Dec 8):** If Docker setup fails → Simplify to local-only first
-- **Week 3 End (Dec 22):** If frontend behind schedule → Deploy basic search UI only, skip chat
-- **Week 4 End (Dec 29):** If deployment issues → Use free tier Railway/Render, optimize later
-- **Week 5 End (Jan 12):** If no user traffic → Reach out to communities (Reddit, Discord, Twitter)
-- **Week 7 End (Jan 26):** If no clear bottlenecks → Skip premature optimization, focus on quality
+- **Step 12 End (Dec 8):** If Docker setup fails → Simplify to local-only first
+- **Step 13 End (Dec 22):** If frontend behind schedule → Deploy basic search UI only, skip chat
+- **Step 14 End (Dec 29):** If deployment issues → Use free tier Railway/Render, optimize later
+- **Step 15 End (Jan 19):** If E2E tests fail after refactoring → Roll back, fix incrementally
+- **Step 16 End (Feb 2):** If no user traffic → Reach out to communities (Reddit, Discord, Twitter)
+- **Step 17 End (Feb 16):** If no clear bottlenecks → Skip premature optimization, focus on quality
 
 💡 **Current Phase: Post Step 11 - Demo Preparation**
 
@@ -384,15 +548,22 @@ Deliverable: Production-ready system, pilot success stories, launch-ready
 - Verification and confidence scoring implemented
 - 48 test files with good coverage
 
-**Next Immediate Actions (Step 12 - This Week):**
-1. **Database Migrations** (1-2 days) - Set up Alembic, generate initial migration
-2. **Deployment Package** (1 day) - Create backend Dockerfile, production docker-compose
-3. **Demo Data** (1 day) - Create seed script with sample PDFs, add sample queries
+**Next Immediate Actions:**
 
-**By End of Week:**
-- Run `docker-compose up` → Full system runs
-- Seed demo data → System has content
-- Ready to start frontend development
+**Step 12 (This Week):**
+1. **Database Migrations** (1-2 days) - Finish Alembic setup
+2. **Deployment Package** (1 day) - Complete Docker setup
+3. **Demo Data** (1 day) - Finalize seed scripts
+
+**Step 12.5 (Dec 5-6, 3-4 hours):**
+1. **Claude Code Infrastructure** - Skills, hooks, dev docs system
+2. **Productivity Boost** - 2-3x faster development for Step 13
+3. **Documentation** - Streamline CLAUDE.md, add modular vision
+
+**By End of Dec:**
+- Run `docker-compose up` → Full system operational
+- Claude Code infrastructure → Ready for fast UI development
+- Step 13 (Frontend) → Begin with productivity tools in place
 
 
 <!-- ### Step 8: Upload Status Tracking (3 hours)

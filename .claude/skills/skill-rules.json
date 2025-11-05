@@ -1,0 +1,70 @@
+{
+  "python-fastapi-dev": {
+    "type": "domain",
+    "enforcement": "suggest",
+    "priority": "high",
+    "promptTriggers": {
+      "keywords": [
+        "fastapi",
+        "route",
+        "endpoint",
+        "pydantic",
+        "sqlalchemy",
+        "celery",
+        "async",
+        "await"
+      ],
+      "intentPatterns": [
+        "(create|add|implement).*?(route|endpoint|api)",
+        "(how to|best practice).*(fastapi|async|celery)",
+        "pydantic.*model",
+        "database.*query"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": [
+        "backend/api/**/*.py",
+        "backend/services/**/*.py",
+        "backend/app/**/*.py"
+      ],
+      "contentPatterns": [
+        "@router\\.",
+        "class.*\\(BaseModel\\)",
+        "@celery_app\\.task",
+        "FastAPI\\(",
+        "AsyncSession"
+      ]
+    }
+  },
+  "testing-patterns": {
+    "type": "domain",
+    "enforcement": "suggest",
+    "priority": "high",
+    "promptTriggers": {
+      "keywords": [
+        "test",
+        "pytest",
+        "fixture",
+        "mock",
+        "assert"
+      ],
+      "intentPatterns": [
+        "(write|create|add).*(test|tests)",
+        "(how to|best practice).*(test|pytest|mock)",
+        "test.*coverage"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": [
+        "backend/tests/**/*.py"
+      ],
+      "contentPatterns": [
+        "@pytest\\.fixture",
+        "def test_",
+        "@pytest\\.mark",
+        "mock\\.",
+        "assert "
+      ]
+    }
+  }
+}
