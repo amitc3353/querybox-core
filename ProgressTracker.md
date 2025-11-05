@@ -317,28 +317,215 @@ Note: Heavy modular architecture work moved to Step 15 (after UI + E2E tests com
 **Step 12.5 COMPLETE** ✅ Claude Code infrastructure fully operational!
 
 ### Step 13 (Dec 9-22)
-Goal: Frontend Development
-## Step 13.1: Next.js Foundation (Dec 9-12)
-* [] Initialize Next.js 14 with TypeScript + Tailwind
-* [] Set up API client for backend endpoints
-* [] Create base layout with navigation
-* [] Add environment configuration
-## Step 13.2: Document Upload UI (Dec 13-15)
-* [] Drag-and-drop upload interface
-* [] Upload progress indicators
-* [] Processing status display (extraction, embedding)
-* [] Document list view with metadata
-## Step 13.3: Search & Chat Interface (Dec 16-19)
-* [] Search bar with real-time results
-* [] Chat interface with message history
-* [] Streaming response display
-* [] Citation links and numbering [1][2]
-## Step 13.4: Citation & Sources (Dec 20-22)
-* [] Citation hover/click to view source text
-* [] Source highlighting in document viewer
-* [] Confidence indicators (STRONG/MEDIUM/WEAK)
-* [] Document reference panel
-Deliverable: Functional UI at localhost:3000 with upload → search → chat flow
+Goal: Enterprise-Grade Frontend Development (1-2 Week MVP)
+
+**Tech Stack:** Next.js 14 (App Router) + TypeScript + Tailwind CSS + shadcn/ui + React Query
+**Design System:** Modern minimalism with electric teal accent, Inter font, responsive mobile-first
+**Approach:** Hybrid (template-inspired layout + custom QueryBox features)
+
+**Dev Docs:** Created in `dev/active/querybox-frontend/` (plan.md, context.md, tasks.md)
+- 200+ granular tasks organized by day
+- Complete API integration guide
+- TypeScript types mapped from backend schemas
+- Component patterns and code examples
+
+## Week 1: Setup + Core Features (Day 1-7)
+
+### Day 1-2: Project Setup + Design System
+* [] Initialize Next.js 14 with TypeScript + Tailwind CSS
+* [] Install dependencies (React Query, Axios, react-hook-form, Zod)
+* [] Setup shadcn/ui (install core components: button, card, input, dialog, table, etc.)
+* [] Create directory structure (app routes, components, lib/api)
+* [] Configure environment (.env.local with NEXT_PUBLIC_API_URL)
+* [] Setup design system (custom colors, Inter font, Tailwind config)
+* [] Create base utilities (formatters, validators, constants)
+* [] Create TypeScript types from backend schemas (document.ts, search.ts, answer.ts)
+* [] Setup API client (Axios with interceptors, error handling)
+* [] Create React Query provider and hooks (useDocuments, useSearch, useAnswer)
+
+### Day 3-4: Layout Components + Document Management
+* [] Create layout components (Sidebar, Topbar, PageHeader)
+* [] Build dashboard layout (sidebar + topbar + main content)
+* [] Implement responsive layout (mobile: hamburger, tablet: collapsible, desktop: expanded)
+* [] Create common components (LoadingSpinner, EmptyState, ErrorBoundary, ConfirmDialog)
+* [] Build DocumentUpload component (drag-drop with react-dropzone, validation, progress)
+* [] Create upload page with multi-file support
+* [] Build DocumentCard component (name, type, size, status badge, actions)
+* [] Create DocumentTable component (sortable, paginated)
+* [] Build DocumentStatus component (real-time processing indicator with polling)
+* [] Create DocumentFilters component (filter by status, type, date)
+* [] Build document list page (card/table toggle, pagination, filters, search)
+* [] Create document details page (metadata, processing status, delete with confirmation)
+
+### Day 5-6: Search Interface
+* [] Create SearchBar component (debounced input, clear button, Enter key support)
+* [] Build SearchFilters component (strategy radio buttons, advanced filters collapsible)
+  - Document types multi-select
+  - Date range picker
+  - Quality threshold slider
+  - Enable reranking/MMR checkboxes
+* [] Create SearchResult component (document info, relevance score, snippet, citations)
+* [] Build SearchResults component (list with loading skeleton, empty state, result count)
+* [] Create CitationHighlight component (color-coded by quality: green/yellow/red)
+* [] Build CitationTooltip component (hover details: passage, page, section, confidence)
+* [] Create search page (SearchBar + filters sidebar + results + pagination)
+* [] Implement URL state management (query and filters in URL params)
+* [] Add loading, error, and empty states
+
+### Day 7: Chat Interface (Part 1)
+* [] Create ChatInterface component (scrollable message area, auto-scroll)
+* [] Build ChatMessage component (user/assistant bubbles, timestamp, avatar)
+* [] Create ChatInput component (auto-resize textarea, send button, character count)
+* [] Build quality level selector (tabs: Fast/Verified/Enhanced with estimated times)
+* [] Create AnswerCard component (answer text with citation refs [1][2], processing time)
+* [] Build ConfidenceIndicator component (color-coded progress bar 0-100%, breakdown tooltip)
+* [] Create chat page layout with quality selector
+* [] Add loading state with estimated time display
+
+## Week 2: Chat + Analytics + Polish (Day 8-14)
+
+### Day 8-9: Chat Interface (Part 2) + Advanced Features
+* [] Create CitationList component (numbered accordion, expandable citations)
+  - Document name with link
+  - Passage text highlighted
+  - Page and section
+  - Confidence score and quality badge (STRONG/MEDIUM/WEAK)
+* [] Integrate citations into AnswerCard (clickable inline numbers, scroll to citation)
+* [] Build AbstractionAlert component (special warning alert)
+  - Show abstention message
+  - Display factors (low confidence, high hallucination, no evidence)
+  - Suggestions (refine query, upload more docs, specify documents)
+* [] Create confidence breakdown component (detailed metrics)
+  - Overall confidence
+  - Average passage relevance, quote quality, verification agreement
+  - Citation count breakdown (Strong/Medium/Weak)
+* [] Add "Advanced Details" collapsible section (hallucination probability, propositions)
+* [] Implement chat history display (conversation state management)
+* [] Add clear chat functionality
+
+### Day 10-11: Analytics Dashboard
+* [] Create StatsCard component (KPI with number, label, trend indicator, icon)
+* [] Build KPI cards (Total Docs, Storage Used, Ready for Search, Failed Docs)
+* [] Create UploadTrendChart component (Recharts line chart, responsive, tooltip)
+* [] Build DocumentTypeChart component (Recharts pie/bar chart, legend, colors)
+* [] Create ProcessingStatusChart component (bar chart by status, color-coded)
+* [] Build SystemHealthCard component (health indicators with status colors)
+  - Database, Redis, Storage, Ollama status
+  - Disk space usage progress bar
+  - Last checked timestamp
+* [] Create analytics page (grid layout: stats cards, charts, system health)
+* [] Add date range filter (7d, 30d, 90d, 1y, all)
+* [] Implement auto-refresh (every 5 minutes)
+* [] Update dashboard home page (redirect to analytics or show overview)
+
+### Day 12-13: Responsive Design + Accessibility + Polish
+* [] Mobile responsive (<768px)
+  - Sidebar to hamburger menu with slide-in drawer
+  - Document list: card layout only (full-width)
+  - Search: full-width with filters in bottom sheet
+  - Chat: single-column with sticky input
+  - Analytics: 1-2 column stacked layout
+* [] Tablet responsive (768-1024px)
+  - Collapsible sidebar with toggle
+  - Document list: compact table
+  - Search: 2-column (filters + results)
+  - Analytics: 2-column charts
+* [] Desktop responsive (>1024px)
+  - Full expanded sidebar
+  - Document list: full table with all columns
+  - Search: 3-column layout
+  - Analytics: 3-4 column layout
+* [] Accessibility (WCAG 2.1 AA)
+  - Keyboard navigation (Tab, Enter, Escape, Arrow keys)
+  - ARIA labels for icon buttons
+  - Focus indicators on all interactive elements
+  - Color contrast ≥4.5:1 for text
+  - Semantic HTML (nav, main, article headings)
+  - Screen reader support
+* [] Error handling
+  - Global error handler in API client
+  - Error boundaries on major pages
+  - User-friendly error messages (400, 401, 404, 413, 429, 500)
+  - Toast notifications for all error cases
+* [] Loading states
+  - Skeleton loaders (document list, search results, analytics)
+  - Progress indicators (file upload, chat answer generation)
+  - Loading with estimated time for chat
+* [] Empty states
+  - Documents list: "Upload your first document" CTA
+  - Search results: "No results found" with suggestions
+  - Chat: "Ask a question" with examples
+* [] Optimistic updates
+  - Document delete (remove immediately, revert on error)
+  - Document upload (add to list with "uploading" status)
+* [] Form validation
+  - File upload: type and size validation before submit
+  - Search: min query length (3 chars)
+  - Chat: character count (1-500 chars)
+* [] Polish
+  - Consistent spacing (Tailwind scale)
+  - Smooth transitions (hover, fade, slide)
+  - Typography hierarchy (text-2xl → text-xl → text-base → text-sm)
+  - Icon consistency (lucide-react, 20px default)
+
+### Day 14: Testing + Deployment + Documentation
+* [] Manual testing
+  - Upload flow (single, multiple, invalid type, too large, processing status)
+  - Document management (list, pagination, sorting, filtering, delete, search by name)
+  - Search (keyword, semantic, hybrid, filters, citations)
+  - Chat (all quality levels, citations, confidence, abstention)
+  - Analytics (stats, charts, date range, health)
+  - Responsive (mobile, tablet, desktop)
+  - Accessibility (keyboard, screen reader, contrast)
+* [] Cross-browser testing (Chrome, Firefox, Safari, Edge)
+* [] Performance testing
+  - Lighthouse audit (Performance ≥90, Accessibility ≥95)
+  - Bundle size check (<500KB gzipped)
+  - Test with 3G throttling (page load <5s)
+* [] Code quality
+  - Run ESLint (fix errors and warnings)
+  - TypeScript compile (no `any` types)
+  - Code review (reusability, naming, error handling)
+* [] Production build
+  - Build: `npm run build`
+  - Test locally: `npm run start`
+* [] Deploy to Vercel
+  - Connect GitHub repo
+  - Configure environment variables
+  - Deploy and test
+* [] Documentation updates
+  - Update README.md (frontend setup, development, deployment)
+  - Update ARCHITECTURE.md (frontend architecture, components)
+  - Update ProgressTracker.md (mark Step 13 complete)
+  - Update CLAUDE.md (current phase to Step 14)
+  - Create frontend/README.md (tech stack, structure, development guide)
+
+**Deliverable:**
+- ✅ Functional UI at localhost:3000 (Vercel deployment)
+- ✅ All 4 MVP features complete (Upload, Search, Chat, Analytics)
+- ✅ Full backend API integration with TypeScript types
+- ✅ Real-time document processing status updates
+- ✅ Citation system with quality indicators (STRONG/MEDIUM/WEAK)
+- ✅ Confidence scoring and abstention handling
+- ✅ Responsive design (mobile, tablet, desktop)
+- ✅ Accessible (WCAG 2.1 AA compliant)
+- ✅ Error handling and loading states throughout
+- ✅ Professional, premium UI/UX (distinct from generic dashboards)
+- ✅ Complete documentation and deployment guide
+
+**Success Criteria:**
+- All backend endpoints integrated and working
+- Upload → Process → Search → Chat flow fully functional
+- Real-time status updates with 2-3s polling
+- Citations display correctly with color coding
+- Performance: Initial load <2s, search results <500ms
+- Lighthouse scores: Performance ≥90, Accessibility ≥95
+- Zero console errors in production build
+
+**Future Enhancements (Step 14+):**
+- Step 14: Replace Recharts with Tremor for advanced analytics
+- Step 15: Multi-client white-labeling (themes, logos, feature toggles)
+- Step 16+: Real-time WebSocket, annotations, saved searches, export
 
 ### Step 14 (Dec 23-29)
 Goal: End-to-End Testing & Live Demo (Safety Net for Step 15 Refactoring)

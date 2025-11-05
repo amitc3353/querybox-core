@@ -1,0 +1,1066 @@
+# QueryBox Frontend - Implementation Context
+
+**Last Updated**: 2025-01-05 (Evening - Day 1-2 90% Complete)
+**Current Phase**: Day 1-2 Implementation → Project Setup Complete
+**Next Session**: Complete API Client Setup (Day 2-3)
+
+---
+
+## 1. Quick Start Reference
+
+### Resume This Work
+```bash
+cd /Users/amitchandel/Documents/workspace/build5M/querybox-core
+
+# When starting implementation:
+cd frontend/
+npm install
+npm run dev  # Start dev server on http://localhost:3000
+```
+
+### Key Commands
+```bash
+# Development
+npm run dev                    # Start dev server
+npm run build                  # Production build
+npm run start                  # Run production build
+npm run lint                   # Lint code
+
+# shadcn/ui components
+npx shadcn-ui@latest add button
+npx shadcn-ui@latest add card
+npx shadcn-ui@latest add dialog
+# etc.
+
+# Backend (parallel terminal)
+cd backend/
+docker-compose up -d           # Start backend services
+```
+
+---
+
+## 1A. Current Progress (Updated: Nov 5, 2025 Evening)
+
+### ✅ Completed (Day 1-2: 90%)
+
+**1. Next.js 14 Project Initialized**
+- ✅ TypeScript configured (strict mode) - `tsconfig.json`
+- ✅ Tailwind CSS 3.4+ with electric teal theme - `tailwind.config.ts`
+- ✅ App Router structure - `app/` directory
+- ✅ ESLint configured - `.eslintrc.json`
+- ✅ Build verified: `npm run build` succeeds (0 errors, 102kB bundle)
+
+**2. Dependencies Installed (455 packages, 0 vulnerabilities)**
+- ✅ React Query v5 + DevTools
+- ✅ Axios, React Hook Form, Zod
+- ✅ clsx, tailwind-merge, class-variance-authority
+- ✅ react-dropzone, recharts, lucide-react, date-fns
+- ✅ autoprefixer, postcss, tailwindcss-animate
+
+**3. shadcn/ui Fully Configured**
+- ✅ `components.json` - shadcn/ui settings
+- ✅ `lib/utils.ts` - cn() utility function
+- ✅ `tailwind.config.ts` - Extended with shadcn/ui theme
+- ✅ `app/globals.css` - CSS variables for light/dark mode
+- ✅ tailwindcss-animate plugin installed
+
+**4. Directory Structure Created**
+- ✅ `app/(dashboard)/` - Dashboard routes structure
+  - `documents/`, `search/`, `chat/`, `analytics/`
+- ✅ `components/` - All feature directories created
+  - `ui/`, `layout/`, `documents/`, `search/`, `chat/`, `analytics/`, `common/`
+- ✅ `lib/api/` - API integration structure
+  - `types/`, `endpoints/`, `hooks/`
+- ✅ `lib/utils/` - Utility functions
+- ✅ `public/images/` - Assets directory
+
+**5. Base Configuration Files**
+- ✅ `.env.local` - Environment variables (API_URL, APP_NAME, MAX_FILE_SIZE)
+- ✅ `app/providers.tsx` - React Query provider configured
+- ✅ `app/layout.tsx` - Root layout with Providers wrapper
+- ✅ `app/page.tsx` - Landing page placeholder
+
+**6. Base Utilities Implemented**
+- ✅ `lib/utils/formatters.ts` - File size, dates, confidence, citation colors
+- ✅ `lib/utils/validators.ts` - File type/size, email, query length validation
+- ✅ `lib/utils/constants.ts` - API URLs, file types, status mappings, search strategies
+
+### ⏳ Remaining (Day 2-3: 10%)
+- ⏳ Setup API client (`lib/api/client.ts`)
+- ⏳ Create TypeScript types from backend schemas (`lib/api/types/*.ts`)
+- ⏳ Create API endpoint functions (`lib/api/endpoints/*.ts`)
+- ⏳ Create React Query hooks (`lib/api/hooks/*.ts`)
+
+### 📊 Stats
+- **Total Packages**: 455
+- **Security Issues**: 0
+- **Build Time**: ~1.2s
+- **Bundle Size**: 102kB (First Load JS)
+- **Directory**: `/Users/amitchandel/Documents/workspace/build5M/querybox-core/frontend`
+
+---
+
+## 2. Project Structure Overview
+
+### Current State (UPDATED - Now Built!)
+```
+querybox-core/
+├── app/                       # ✅ Backend (FastAPI) - at root level
+│   ├── api/v1/endpoints/      # All API routes ready
+│   ├── models/                # SQLAlchemy models
+│   ├── schemas/               # Pydantic schemas (USE FOR TYPES)
+│   └── services/              # Business logic
+├── tests/                     # Backend tests
+├── frontend/                  # ✅ 90% Complete (Next.js 14)
+│   ├── app/                   # ✅ App Router configured
+│   │   ├── (dashboard)/       # ✅ Structure created
+│   │   ├── globals.css        # ✅ Tailwind + theme variables
+│   │   ├── layout.tsx         # ✅ Root layout with providers
+│   │   ├── page.tsx           # ✅ Landing page
+│   │   └── providers.tsx      # ✅ React Query provider
+│   ├── components/            # ✅ All directories created
+│   │   ├── ui/                # For shadcn/ui components
+│   │   ├── layout/            # Sidebar, Topbar, etc.
+│   │   ├── documents/         # Document components
+│   │   ├── search/            # Search components
+│   │   ├── chat/              # Chat components
+│   │   ├── analytics/         # Analytics components
+│   │   └── common/            # Shared components
+│   ├── lib/                   # ✅ Structure + utilities complete
+│   │   ├── api/               # ⏳ API integration (next step)
+│   │   │   ├── types/         # TypeScript types (to create)
+│   │   │   ├── endpoints/     # API functions (to create)
+│   │   │   └── hooks/         # React Query hooks (to create)
+│   │   ├── utils/             # ✅ All utilities created
+│   │   │   ├── utils.ts       # ✅ cn() utility
+│   │   │   ├── formatters.ts  # ✅ File size, dates, etc.
+│   │   │   ├── validators.ts  # ✅ File/query validation
+│   │   │   └── constants.ts   # ✅ All app constants
+│   │   └── utils.ts           # ✅ cn() utility (shadcn/ui)
+│   ├── public/images/         # ✅ Assets directory
+│   ├── .env.local             # ✅ Environment variables
+│   ├── components.json        # ✅ shadcn/ui config
+│   ├── tailwind.config.ts     # ✅ Custom theme
+│   ├── tsconfig.json          # ✅ TypeScript config
+│   ├── next.config.mjs        # ✅ Next.js config
+│   ├── postcss.config.mjs     # ✅ PostCSS config
+│   └── package.json           # ✅ 455 packages installed
+├── dev/
+│   └── active/
+│       └── querybox-frontend/ # This documentation
+└── docker-compose.yml
+```
+
+### Target Frontend Structure
+```
+frontend/
+├── app/                       # Next.js App Router
+│   ├── (dashboard)/           # Main app routes
+│   │   ├── layout.tsx         # Sidebar + Topbar layout
+│   │   ├── page.tsx           # Dashboard home (analytics)
+│   │   ├── documents/
+│   │   │   ├── page.tsx       # Document list
+│   │   │   ├── upload/
+│   │   │   │   └── page.tsx   # Upload page
+│   │   │   └── [id]/
+│   │   │       └── page.tsx   # Document details
+│   │   ├── search/
+│   │   │   └── page.tsx       # Search interface
+│   │   ├── chat/
+│   │   │   └── page.tsx       # Q&A interface
+│   │   └── analytics/
+│   │       └── page.tsx       # Analytics dashboard
+│   ├── layout.tsx             # Root layout
+│   ├── page.tsx               # Landing (redirect to /documents)
+│   └── providers.tsx          # React Query provider
+├── components/
+│   ├── ui/                    # shadcn/ui components (generated)
+│   ├── layout/                # Layout components
+│   ├── documents/             # Document-specific components
+│   ├── search/                # Search-specific components
+│   ├── chat/                  # Chat-specific components
+│   ├── analytics/             # Analytics components
+│   └── common/                # Shared components
+├── lib/
+│   ├── api/                   # API client & hooks
+│   │   ├── client.ts          # Axios instance
+│   │   ├── types/             # TypeScript types (from backend schemas)
+│   │   ├── endpoints/         # API endpoint functions
+│   │   └── hooks/             # React Query hooks
+│   └── utils/                 # Utilities
+│       ├── formatters.ts      # Date, file size formatters
+│       ├── validators.ts      # Client-side validation
+│       └── constants.ts       # Constants
+├── public/                    # Static assets
+│   ├── images/
+│   └── favicon.ico
+├── styles/
+│   └── globals.css            # Tailwind + global styles
+├── .env.local                 # Environment variables
+├── next.config.js
+├── tailwind.config.ts
+├── tsconfig.json
+└── package.json
+```
+
+---
+
+## 3. Backend API Integration Guide
+
+### API Base URL
+```typescript
+// .env.local
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
+
+### Complete API Reference
+
+All endpoints are prefixed with `/api/v1` unless otherwise noted.
+
+#### Upload & Documents
+```typescript
+// Upload
+POST   /api/v1/upload/                    // Upload file
+GET    /api/v1/upload/allowed-types       // Get allowed types
+
+// Documents
+GET    /api/v1/documents/                 // List documents (paginated)
+GET    /api/v1/documents/search           // Search documents by name
+GET    /api/v1/documents/stats            // Get statistics
+GET    /api/v1/documents/{id}             // Get document details
+GET    /api/v1/documents/{id}/status      // Get processing status
+GET    /api/v1/documents/{id}/search-quality  // Validate search readiness
+DELETE /api/v1/documents/{id}             // Delete document
+
+// Search
+POST   /api/v1/search/hybrid              // Hybrid search (RECOMMENDED)
+POST   /api/v1/search/keyword             // Keyword search
+POST   /api/v1/search/semantic            // Vector search
+POST   /api/v1/search/unified             // Unified with strategy selection
+GET    /api/v1/search/health              // Search health check
+
+// Answer (requires X-API-Key header)
+POST   /api/v1/answer                     // Basic answer (fast)
+POST   /api/v1/answer/verified            // Verified answer (hallucination detection)
+POST   /api/v1/answer/enhanced            // Enhanced answer (RECOMMENDED)
+GET    /api/v1/answer/health/ollama       // Ollama health check
+
+// Metadata
+GET    /api/v1/metadata/documents/{id}/metadata        // Get metadata
+POST   /api/v1/metadata/documents/{id}/metadata/extract  // Extract metadata
+
+// Metrics
+GET    /api/v1/metrics/summary            // Pipeline metrics
+GET    /api/v1/metrics/health-detailed    // Detailed health
+
+// Health
+GET    /health                            // Main health check
+```
+
+### Key Request/Response Types
+
+**Reference Location**: `backend/app/schemas/` - Copy these to `frontend/lib/api/types/`
+
+#### Document Types
+```typescript
+// Document Response
+interface DocumentResponse {
+  id: string;
+  document_name: string;
+  original_name: string;
+  mime_type: string;
+  file_extension: string;
+  file_size: number;
+  file_size_mb: number;
+  storage_provider: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  processing_status?: {
+    extraction: ProcessingStatusDetail;
+    chunking: ProcessingStatusDetail;
+    embedding: ProcessingStatusDetail;
+  };
+}
+
+// Processing Status Detail
+interface ProcessingStatusDetail {
+  status: string;
+  started_at?: string;
+  completed_at?: string;
+  progress?: number;
+  error_message?: string;
+}
+
+// Upload Response
+interface UploadResponse {
+  success: boolean;
+  message: string;
+  duplicate?: boolean;
+  document: DocumentResponse;
+  processing_status?: {
+    extraction_status: string;
+    chunking_status: string;
+    embedding_status: string;
+    ready_for_search: boolean;
+  };
+}
+```
+
+#### Search Types
+```typescript
+// Search Request
+interface SearchRequest {
+  query: string;
+  filters?: SearchFilters;
+  limit?: number;
+  offset?: number;
+  similarity_threshold?: number;
+  keyword_weight?: number;
+  vector_weight?: number;
+  enable_reranking?: boolean;
+}
+
+interface SearchFilters {
+  document_types?: string[];
+  date_from?: string;
+  date_to?: string;
+  min_quality?: number;
+  tags?: string[];
+}
+
+// Search Response
+interface SearchResponse {
+  success: boolean;
+  query: string;
+  total_results: number;
+  returned_results: number;
+  results: SearchResultItemWithCitations[];
+  processing_time_ms: number;
+}
+
+interface SearchResultItemWithCitations {
+  chunk_id?: string;
+  document_id: string;
+  document_name: string;
+  relevance_score: number;
+  snippet?: string;
+  citations: Citation[];
+  snippet_highlighted?: string;
+}
+
+interface Citation {
+  text: string;
+  page?: number;
+  section?: string;
+  position: { start: number; end: number };
+  confidence: number;
+  source_context: string;
+}
+```
+
+#### Answer Types
+```typescript
+// Answer Request
+interface AnswerRequest {
+  query: string;
+  document_ids?: string[];
+  top_k?: number;
+  temperature?: number;
+  include_citations?: boolean;
+}
+
+// Enhanced Answer Response (RECOMMENDED)
+interface EnhancedAnswerResponse {
+  success: boolean;
+  abstained: boolean;
+  abstention_message?: string;
+  answer: string;
+  verified_answer: string;
+  enriched_citations: EnrichedCitation[];
+  confidence: number;
+  verified_confidence?: number;
+  enhanced_metadata: {
+    status: string;
+    hallucination_probability?: number;
+    propositions_checked: number;
+    propositions_verified: number;
+    confidence_breakdown: {
+      overall: number;
+      average_passage_relevance: number;
+      average_quote_quality: number;
+    };
+    proposition_details: PropositionDetail[];
+    abstention_factors: {
+      low_confidence?: boolean;
+      high_hallucination?: boolean;
+      no_evidence?: boolean;
+    };
+    total_citations: number;
+    strong_citations: number;
+    medium_citations: number;
+    weak_citations: number;
+  };
+}
+
+interface EnrichedCitation {
+  document_id: string;
+  document_name: string;
+  passage_text: string;
+  highlighted_passage_text?: string;
+  page?: number;
+  section?: string;
+  relevance_score: number;
+  citation_number: number;
+  quality: "STRONG" | "MEDIUM" | "WEAK";
+  is_exact_quote: boolean;
+  best_similarity?: number;
+}
+```
+
+---
+
+## 4. Implementation Patterns
+
+### API Client Setup (Critical First Step)
+
+**File**: `lib/api/client.ts`
+
+```typescript
+import axios, { AxiosInstance } from 'axios';
+
+const apiClient: AxiosInstance = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
+  timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Request interceptor
+apiClient.interceptors.request.use(
+  (config) => {
+    // Add API key for answer endpoints
+    const apiKey = typeof window !== 'undefined'
+      ? localStorage.getItem('api_key')
+      : null;
+
+    if (apiKey && config.url?.includes('/answer')) {
+      config.headers['X-API-Key'] = apiKey;
+    }
+
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Response interceptor
+apiClient.interceptors.response.use(
+  (response) => response.data,
+  (error) => {
+    const message = error.response?.data?.detail || error.message;
+    console.error('API Error:', message);
+    return Promise.reject(error);
+  }
+);
+
+export default apiClient;
+```
+
+### React Query Hooks Pattern
+
+**File**: `lib/api/hooks/useDocuments.ts`
+
+```typescript
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { DocumentAPI } from '../endpoints/documents';
+import type { DocumentResponse } from '../types/document';
+
+// List documents
+export function useDocuments(params?: {
+  page?: number;
+  page_size?: number;
+  status?: string;
+}) {
+  return useQuery({
+    queryKey: ['documents', params],
+    queryFn: () => DocumentAPI.list(params),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+}
+
+// Single document with auto-refresh during processing
+export function useDocument(id: string) {
+  return useQuery({
+    queryKey: ['document', id],
+    queryFn: () => DocumentAPI.get(id),
+    refetchInterval: (data) => {
+      // Poll every 2s if processing, stop if completed/failed
+      const status = data?.status;
+      return status === 'processing' || status === 'uploading'
+        ? 2000
+        : false;
+    },
+  });
+}
+
+// Delete document
+export function useDeleteDocument() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => DocumentAPI.delete(id),
+    onSuccess: () => {
+      // Invalidate documents list
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+    },
+  });
+}
+```
+
+### File Upload with Progress
+
+**File**: `lib/api/hooks/useUpload.ts`
+
+```typescript
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import axios from 'axios';
+
+export function useUploadDocument() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      file,
+      onProgress
+    }: {
+      file: File;
+      onProgress?: (progress: number) => void;
+    }) => {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/upload/`,
+        formData,
+        {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          onUploadProgress: (progressEvent) => {
+            const progress = progressEvent.total
+              ? Math.round((progressEvent.loaded * 100) / progressEvent.total)
+              : 0;
+            onProgress?.(progress);
+          },
+        }
+      );
+
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+    },
+  });
+}
+```
+
+### Search with Debouncing
+
+**Component**: `components/search/SearchBar.tsx`
+
+```typescript
+'use client';
+
+import { useState, useCallback } from 'react';
+import { useDebounce } from '@/lib/hooks/useDebounce';
+import { useSearch } from '@/lib/api/hooks/useSearch';
+import { Input } from '@/components/ui/input';
+
+export function SearchBar() {
+  const [query, setQuery] = useState('');
+  const debouncedQuery = useDebounce(query, 300);
+
+  const { data, isLoading } = useSearch({
+    query: debouncedQuery,
+    enabled: debouncedQuery.length >= 3,
+  });
+
+  return (
+    <div>
+      <Input
+        type="text"
+        placeholder="Search documents..."
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+      />
+      {isLoading && <Spinner />}
+      {data && <SearchResults results={data.results} />}
+    </div>
+  );
+}
+```
+
+### Citation Display with Quality Color Coding
+
+**Component**: `components/search/CitationHighlight.tsx`
+
+```typescript
+import { cn } from '@/lib/utils';
+
+interface CitationHighlightProps {
+  citation: {
+    text: string;
+    quality: 'STRONG' | 'MEDIUM' | 'WEAK';
+    confidence: number;
+  };
+}
+
+export function CitationHighlight({ citation }: CitationHighlightProps) {
+  const qualityColors = {
+    STRONG: 'bg-green-100 border-green-500 text-green-900',
+    MEDIUM: 'bg-yellow-100 border-yellow-500 text-yellow-900',
+    WEAK: 'bg-red-100 border-red-500 text-red-900',
+  };
+
+  return (
+    <mark
+      className={cn(
+        'px-1 rounded border-l-2',
+        qualityColors[citation.quality]
+      )}
+    >
+      {citation.text}
+    </mark>
+  );
+}
+```
+
+### Abstention Alert
+
+**Component**: `components/chat/AbstractionAlert.tsx`
+
+```typescript
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { AlertCircle } from 'lucide-react';
+
+interface AbstractionAlertProps {
+  message: string;
+  factors: {
+    low_confidence?: boolean;
+    high_hallucination?: boolean;
+    no_evidence?: boolean;
+  };
+}
+
+export function AbstractionAlert({ message, factors }: AbstractionAlertProps) {
+  return (
+    <Alert variant="warning" className="border-yellow-500 bg-yellow-50">
+      <AlertCircle className="h-4 w-4" />
+      <AlertTitle>Unable to answer confidently</AlertTitle>
+      <AlertDescription>
+        <p className="mb-2">{message}</p>
+        <p className="text-sm text-neutral-600">
+          Suggestions:
+          <ul className="list-disc ml-4 mt-1">
+            <li>Try rephrasing your question</li>
+            <li>Upload more relevant documents</li>
+            <li>Specify which documents to search</li>
+          </ul>
+        </p>
+      </AlertDescription>
+    </Alert>
+  );
+}
+```
+
+---
+
+## 5. Key Files to Reference
+
+### Backend Schemas (Copy to Frontend Types)
+
+**Location**: `backend/app/schemas/`
+
+1. **`upload.py`** → `frontend/lib/api/types/upload.ts`
+   - `UploadResponse`
+   - `AllowedTypesResponse`
+
+2. **`document.py`** → `frontend/lib/api/types/document.ts`
+   - `DocumentResponse`
+   - `DocumentListResponse`
+   - `DocumentStatsResponse`
+
+3. **`search.py`** → `frontend/lib/api/types/search.ts`
+   - `SearchRequest`
+   - `SearchResponse`
+   - `SearchResultItemWithCitations`
+
+4. **`answer.py`** → `frontend/lib/api/types/answer.ts`
+   - `AnswerRequest`
+   - `AnswerResponse`
+
+5. **`verification.py`** → `frontend/lib/api/types/verification.ts`
+   - `VerificationMetadata`
+
+6. **`citation_confidence.py`** → `frontend/lib/api/types/citation.ts`
+   - `EnrichedCitation`
+   - `PropositionDetail`
+
+### Design References
+
+**TailAdmin React Template**: Use for layout inspiration
+- Sidebar structure
+- Topbar with user menu
+- Card layouts
+- Table designs
+
+**shadcn/ui Examples**: https://ui.shadcn.com/examples
+- Dashboard layout
+- Form patterns
+- Data tables
+
+---
+
+## 6. Environment Configuration
+
+### Frontend Environment Variables
+
+**File**: `frontend/.env.local`
+
+```env
+# API Configuration
+NEXT_PUBLIC_API_URL=http://localhost:8000
+
+# App Configuration
+NEXT_PUBLIC_APP_NAME=QueryBox
+NEXT_PUBLIC_MAX_FILE_SIZE_MB=30
+
+# Feature Flags (optional)
+NEXT_PUBLIC_ENABLE_ANALYTICS=true
+NEXT_PUBLIC_ENABLE_DARK_MODE=false
+```
+
+### Backend Configuration (For Reference)
+
+**File**: `backend/.env`
+
+```env
+# Already configured - no changes needed
+DATABASE_URL=postgresql://querybox:dev123@localhost:5432/querybox
+REDIS_URL=redis://localhost:6379/0
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=qwen2:7b
+```
+
+---
+
+## 7. Dependencies to Install
+
+### Core Dependencies
+```json
+{
+  "dependencies": {
+    "next": "^14.1.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "typescript": "^5.3.3",
+
+    "@tanstack/react-query": "^5.17.0",
+    "@tanstack/react-query-devtools": "^5.17.0",
+    "axios": "^1.6.5",
+
+    "react-hook-form": "^7.49.3",
+    "zod": "^3.22.4",
+    "@hookform/resolvers": "^3.3.4",
+
+    "react-dropzone": "^14.2.3",
+    "recharts": "^2.10.3",
+    "lucide-react": "^0.309.0",
+
+    "clsx": "^2.1.0",
+    "tailwind-merge": "^2.2.0",
+    "class-variance-authority": "^0.7.0",
+
+    "date-fns": "^3.0.6"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.1",
+    "postcss": "^8.4.33",
+    "autoprefixer": "^10.4.17",
+    "@types/node": "^20.11.5",
+    "@types/react": "^18.2.48",
+    "@types/react-dom": "^18.2.18",
+    "eslint": "^8.56.0",
+    "eslint-config-next": "^14.1.0"
+  }
+}
+```
+
+### shadcn/ui Components to Install
+
+**Install as needed**:
+```bash
+npx shadcn-ui@latest init
+npx shadcn-ui@latest add button
+npx shadcn-ui@latest add card
+npx shadcn-ui@latest add input
+npx shadcn-ui@latest add label
+npx shadcn-ui@latest add select
+npx shadcn-ui@latest add dialog
+npx shadcn-ui@latest add dropdown-menu
+npx shadcn-ui@latest add table
+npx shadcn-ui@latest add tabs
+npx shadcn-ui@latest add toast
+npx shadcn-ui@latest add alert
+npx shadcn-ui@latest add badge
+npx shadcn-ui@latest add progress
+npx shadcn-ui@latest add separator
+npx shadcn-ui@latest add skeleton
+```
+
+---
+
+## 8. Current Progress Snapshot
+
+### Completed
+- ✅ Backend fully implemented (FastAPI + all endpoints)
+- ✅ All API schemas defined (Pydantic models)
+- ✅ Database models complete (SQLAlchemy)
+- ✅ Docker setup for backend services
+- ✅ Frontend development plan created
+- ✅ Implementation context documented
+
+### In Progress
+- 🚧 Frontend project setup (Next.js + TypeScript)
+
+### Not Started
+- ⏳ shadcn/ui installation
+- ⏳ API client implementation
+- ⏳ React Query hooks
+- ⏳ Component development
+- ⏳ Page layouts
+- ⏳ Integration with backend
+
+---
+
+## 9. Next Immediate Steps
+
+### When Resuming This Work
+
+1. **Start Backend Services**
+   ```bash
+   cd backend/
+   docker-compose up -d
+   python backend/scripts/health_check.py  # Verify all services running
+   ```
+
+2. **Initialize Frontend Project**
+   ```bash
+   cd frontend/
+   npx create-next-app@latest . --typescript --tailwind --app
+   npm install @tanstack/react-query axios react-hook-form zod
+   ```
+
+3. **Install shadcn/ui**
+   ```bash
+   npx shadcn-ui@latest init
+   # Choose:
+   # - Style: Default
+   # - Base color: Neutral
+   # - CSS variables: Yes
+   ```
+
+4. **Create Directory Structure**
+   ```bash
+   mkdir -p app/\(dashboard\)/{documents,search,chat,analytics}
+   mkdir -p components/{ui,layout,documents,search,chat,analytics,common}
+   mkdir -p lib/api/{types,endpoints,hooks}
+   mkdir -p lib/utils
+   ```
+
+5. **Copy Backend Schemas to Frontend Types**
+   - Manually convert Pydantic models to TypeScript interfaces
+   - Start with: `document.ts`, `search.ts`, `answer.ts`
+
+6. **Implement API Client**
+   - Create `lib/api/client.ts` with Axios instance
+   - Add interceptors for auth and error handling
+
+7. **Setup React Query**
+   - Create `app/providers.tsx` with QueryClientProvider
+   - Wrap app in providers
+
+8. **Build Layout Components**
+   - `components/layout/Sidebar.tsx`
+   - `components/layout/Topbar.tsx`
+   - `app/(dashboard)/layout.tsx`
+
+9. **Follow Task Checklist**
+   - See `tasks.md` for granular implementation steps
+   - Mark tasks as completed as you go
+
+---
+
+## 10. Troubleshooting Guide
+
+### Common Issues
+
+**Issue**: CORS error when calling backend from frontend
+**Solution**:
+- Ensure backend CORS origins include `http://localhost:3000`
+- Check `backend/app/core/config.py`: `BACKEND_CORS_ORIGINS`
+
+**Issue**: API key required error for answer endpoints
+**Solution**:
+- Store API key in localStorage: `localStorage.setItem('api_key', 'your-key')`
+- Or use environment variable: `NEXT_PUBLIC_API_KEY`
+
+**Issue**: Document status not updating in real-time
+**Solution**:
+- Use React Query's `refetchInterval` option
+- Set interval to 2000ms during processing
+- Stop polling when status is "completed" or "failed"
+
+**Issue**: File upload fails with 413 error
+**Solution**:
+- Check file size < 30MB
+- Verify backend `MAX_FILE_SIZE` setting
+- Ensure Nginx/proxy allows large uploads
+
+**Issue**: Citation HTML not rendering
+**Solution**:
+- Sanitize HTML with DOMPurify before rendering
+- Or use `dangerouslySetInnerHTML` cautiously
+- Better: Parse `<mark>` tags and render as React components
+
+---
+
+## 11. Performance Benchmarks
+
+### Target Metrics
+
+| Metric | Target | Notes |
+|--------|--------|-------|
+| Initial page load | < 2s | First Contentful Paint |
+| Time to Interactive | < 3s | Fully interactive |
+| Search results render | < 500ms | After API response |
+| File upload (10MB) | < 5s | With progress indicator |
+| Chat answer (enhanced) | 5-8s | Server-side processing time |
+| Document list load | < 1s | 20 items per page |
+
+### Optimization Checklist
+- [ ] Use Next.js Image component for images
+- [ ] Lazy load heavy components (charts, tables)
+- [ ] Debounce search input (300ms)
+- [ ] Paginate long lists (20-50 items/page)
+- [ ] Use React Query caching (5min stale time)
+- [ ] Optimize bundle size (< 500KB gzipped)
+
+---
+
+## 12. Accessibility Checklist
+
+- [ ] All interactive elements keyboard accessible (Tab, Enter, Escape)
+- [ ] Proper heading hierarchy (h1 → h2 → h3)
+- [ ] Alt text for all images
+- [ ] ARIA labels for icon-only buttons
+- [ ] Color contrast ≥ 4.5:1 for text
+- [ ] Focus visible on all interactive elements
+- [ ] Error messages announced to screen readers
+- [ ] Form inputs have associated labels
+
+---
+
+## 13. Security Considerations
+
+### Client-Side
+- [ ] Sanitize all user input before rendering
+- [ ] Use DOMPurify for HTML content (citations)
+- [ ] Never store sensitive data in localStorage (use httpOnly cookies for auth)
+- [ ] Validate file types and sizes client-side (defense in depth)
+- [ ] Use HTTPS in production
+
+### API Integration
+- [ ] API keys stored securely (environment variables, not hardcoded)
+- [ ] Rate limit handling (429 errors)
+- [ ] Input validation (Zod schemas)
+- [ ] CORS configured properly
+- [ ] No sensitive data in URLs (use POST bodies)
+
+---
+
+## 14. Testing Strategy
+
+### Unit Tests (Jest + React Testing Library)
+- Component rendering
+- User interactions (click, type, submit)
+- Utility functions
+- API client error handling
+
+### Integration Tests
+- API integration (MSW for mocking)
+- Form submission flows
+- File upload process
+- Search and results display
+
+### E2E Tests (Playwright or Cypress) - Future
+- Upload → Process → Search flow
+- Search → View Results
+- Chat → Get Answer
+
+---
+
+## 15. Documentation to Update
+
+When implementation is complete, update:
+
+1. **README.md** - Add frontend setup instructions
+2. **ARCHITECTURE.md** - Add frontend architecture section
+3. **ProgressTracker.md** - Mark Step 13 complete
+4. **CLAUDE.md** - Update current phase to Step 14
+
+---
+
+## 16. Next Immediate Steps (Day 2-3)
+
+### 1. Create API Client (15 min)
+**File**: `lib/api/client.ts`
+- Axios instance with baseURL from env
+- Request interceptor for API key
+- Response interceptor for error handling
+- Timeout: 30s
+
+### 2. Create TypeScript Types (30 min)
+Map backend Pydantic schemas to TypeScript:
+- `lib/api/types/common.ts` - ErrorResponse, PaginatedResponse, ProcessingStatusDetail
+- `lib/api/types/document.ts` - DocumentResponse, DocumentListResponse, DocumentStatsResponse
+- `lib/api/types/upload.ts` - UploadResponse, AllowedTypesResponse
+- `lib/api/types/search.ts` - SearchRequest, SearchResponse, Citation
+- `lib/api/types/answer.ts` - AnswerRequest, EnhancedAnswerResponse, EnrichedCitation
+
+**Reference**: `backend/app/schemas/` directory
+
+### 3. Create API Endpoint Functions (45 min)
+- `lib/api/endpoints/upload.ts` - uploadFile, getAllowedTypes
+- `lib/api/endpoints/documents.ts` - listDocuments, getDocument, deleteDocument, etc.
+- `lib/api/endpoints/search.ts` - searchHybrid, searchKeyword, searchSemantic
+- `lib/api/endpoints/answer.ts` - generateEnhancedAnswer
+
+### 4. Create React Query Hooks (30 min)
+- `lib/api/hooks/useUpload.ts` - useUploadDocument, useAllowedTypes
+- `lib/api/hooks/useDocuments.ts` - useDocuments, useDocument (with polling)
+- `lib/api/hooks/useSearch.ts` - useSearch
+- `lib/api/hooks/useAnswer.ts` - useGenerateEnhancedAnswer
+
+**Total Time**: ~2 hours to complete Day 2-3 setup
+
+---
+
+## Summary
+
+**Day 1-2**: 90% Complete ✅
+Project setup, dependencies, structure, and utilities are all done. Build verified and working.
+
+**Day 2-3**: 10% Remaining ⏳
+Just need API integration layer (client, types, endpoints, hooks) - approximately 2 hours of work.
+
+**Next Session**: Continue with Day 2-3 tasks from `tasks.md`
