@@ -22,9 +22,13 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           <div
             className="fixed inset-0 z-40 bg-black/50 md:hidden"
             onClick={() => setMobileMenuOpen(false)}
+            aria-hidden="true"
           />
           <div className="fixed inset-y-0 left-0 z-50 w-64 md:hidden">
-            <Sidebar />
+            <Sidebar
+              mobile={true}
+              onNavigate={() => setMobileMenuOpen(false)}
+            />
           </div>
         </>
       )}

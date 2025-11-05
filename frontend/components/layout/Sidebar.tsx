@@ -35,15 +35,26 @@ const navItems: NavItem[] = [
   },
 ];
 
-export function Sidebar() {
+interface SidebarProps {
+  mobile?: boolean;
+  onNavigate?: () => void;
+}
+
+export function Sidebar({ mobile = false, onNavigate }: SidebarProps = {}) {
   const pathname = usePathname();
 
   return (
-    <aside className="hidden md:flex md:flex-col md:w-64 bg-white border-r border-gray-200 dark:bg-gray-900 dark:border-gray-800">
+    <aside className={cn(
+      "flex flex-col w-64 bg-white border-r border-gray-200 dark:bg-gray-900 dark:border-gray-800",
+      !mobile && "hidden md:flex"
+    )}
+    aria-label="Main navigation"
+    role="navigation"
+    >
       {/* Logo */}
       <div className="flex items-center h-16 px-6 border-b border-gray-200 dark:border-gray-800">
-        <Link href="/documents" className="flex items-center space-x-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center">
+        <Link href="/documents" className="flex items-center space-x-2" aria-label="Go to home page">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center" aria-hidden="true">
             <FileText className="w-5 h-5 text-white" />
           </div>
           <span className="text-xl font-bold text-gray-900 dark:text-white">
@@ -53,7 +64,7 @@ export function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-4 py-6 space-y-1">
+      <nav className="flex-1 px-4 py-6 space-y-1" aria-label="Primary navigation">
         {navItems.map((item) => {
           const isActive = pathname.startsWith(item.href);
           const Icon = item.icon;
@@ -62,6 +73,9 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onNavigate}
+              aria-label={`${item.name} page`}
+              aria-current={isActive ? 'page' : undefined}
               className={cn(
                 'flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors',
                 isActive
@@ -76,6 +90,7 @@ export function Sidebar() {
                     ? 'text-primary-600 dark:text-primary-400'
                     : 'text-gray-500 dark:text-gray-400'
                 )}
+                aria-hidden="true"
               />
               {item.name}
             </Link>

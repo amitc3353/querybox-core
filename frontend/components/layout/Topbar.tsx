@@ -29,15 +29,17 @@ export function Topbar({ onMenuClick }: TopbarProps) {
   };
 
   return (
-    <header className="flex items-center h-16 px-4 bg-white border-b border-gray-200 dark:bg-gray-900 dark:border-gray-800">
+    <header className="flex items-center h-16 px-4 bg-white border-b border-gray-200 dark:bg-gray-900 dark:border-gray-800" role="banner">
       {/* Mobile menu button */}
       <Button
         variant="ghost"
         size="icon"
         className="md:hidden mr-2"
         onClick={onMenuClick}
+        aria-label="Open navigation menu"
+        aria-expanded="false"
       >
-        <Menu className="w-5 h-5" />
+        <Menu className="w-5 h-5" aria-hidden="true" />
       </Button>
 
       {/* Page title / Breadcrumbs */}
@@ -48,23 +50,23 @@ export function Topbar({ onMenuClick }: TopbarProps) {
       </div>
 
       {/* Right side actions */}
-      <div className="flex items-center space-x-2">
+      <nav className="flex items-center space-x-2" aria-label="Top navigation">
         {/* Notifications */}
-        <Button variant="ghost" size="icon">
-          <Bell className="w-5 h-5" />
+        <Button variant="ghost" size="icon" aria-label="Notifications">
+          <Bell className="w-5 h-5" aria-hidden="true" />
         </Button>
 
         {/* Settings */}
-        <Button variant="ghost" size="icon">
-          <Settings className="w-5 h-5" />
+        <Button variant="ghost" size="icon" aria-label="Settings">
+          <Settings className="w-5 h-5" aria-hidden="true" />
         </Button>
 
         {/* User menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" aria-label="User menu">
               <div className="w-8 h-8 rounded-full bg-primary-500 flex items-center justify-center">
-                <User className="w-5 h-5 text-white" />
+                <User className="w-5 h-5 text-white" aria-hidden="true" />
               </div>
             </Button>
           </DropdownMenuTrigger>
@@ -78,7 +80,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
             <DropdownMenuItem>Log out</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-      </div>
+      </nav>
     </header>
   );
 }
