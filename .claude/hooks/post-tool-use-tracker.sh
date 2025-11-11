@@ -2,8 +2,16 @@
 # Post-Tool-Use Tracker Hook
 # Tracks file edits (Edit, Write, MultiEdit operations) for automated testing/checks
 
+# Exit immediately on error (but silently)
+set -e
+
 TOOL_NAME=$1
 FILE_PATH=$2
+
+# Validate parameters exist
+if [ -z "$TOOL_NAME" ]; then
+  exit 0
+fi
 
 # Only track Edit, Write, MultiEdit operations
 if [[ "$TOOL_NAME" != "Edit" && "$TOOL_NAME" != "Write" && "$TOOL_NAME" != "MultiEdit" ]]; then
@@ -39,7 +47,7 @@ fi
 # Get timestamp
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-# Append to log using Python
+# Append to log using Python (suppress all errors to avoid hook error messages)
 python3 -c "
 import json
 import sys
@@ -61,6 +69,6 @@ logs.append(record)
 
 with open(log_file, 'w') as f:
     json.dump(logs, f, indent=2)
-"
+" 2>/dev/null || exit 0
 
 exit 0

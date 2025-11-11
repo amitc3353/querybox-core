@@ -32,7 +32,7 @@ export default function SearchPage() {
       filters,
       limit: 20,
     });
-  }, [searchMutation]);
+  }, [searchMutation.mutate]);
 
   const handleAskAbout = useCallback((chunk: SearchResultChunk) => {
     // Store in session storage for chat page to pick up

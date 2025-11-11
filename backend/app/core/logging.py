@@ -55,12 +55,15 @@ def configure_logging() -> None:
         try:
             from logtail import LogtailHandler
 
-            logtail_handler = LogtailHandler(source_token=settings.LOGTAIL_SOURCE_TOKEN)
+            logtail_handler = LogtailHandler(
+                source_token=settings.LOGTAIL_SOURCE_TOKEN,
+                host=settings.LOGTAIL_HOST
+            )
             logtail_handler.setLevel(log_level)
             handlers.append(logtail_handler)
 
             # Log successful initialization to console
-            print(f"✅ Better Stack logging enabled (log level: {log_level_str})")
+            print(f"✅ Better Stack logging enabled (log level: {log_level_str}, host: {settings.LOGTAIL_HOST})")
         except ImportError:
             print("⚠️  logtail-python not installed. Run: pip install logtail-python")
         except Exception as e:

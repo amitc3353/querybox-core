@@ -59,11 +59,10 @@ export default function ChatPage() {
       // Generate answer
       generateAnswerMutation.mutate(
         {
-          question,
-          quality_level: qualityLevel,
-          conversation_id: conversationId,
+          query: question, // Changed from 'question' to match backend
           include_citations: true,
-          max_citations: 5,
+          top_k: 5, // Number of chunks to retrieve
+          temperature: 0.2, // LLM temperature
         },
         {
           onSuccess: (data) => {

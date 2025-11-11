@@ -41,10 +41,12 @@ export function CitationCard({ citation, index, onViewDocument }: CitationCardPr
 
         {/* Metadata */}
         <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
-          <Badge variant="outline" className="text-xs">
-            {FILE_TYPE_LABELS[`.${citation.metadata.file_type}`] ||
-             citation.metadata.file_type.toUpperCase()}
-          </Badge>
+          {citation.metadata?.file_type && (
+            <Badge variant="outline" className="text-xs">
+              {FILE_TYPE_LABELS[`.${citation.metadata.file_type}`] ||
+               citation.metadata.file_type.toUpperCase()}
+            </Badge>
+          )}
 
           {citation.page_number && (
             <span>Page {citation.page_number}</span>

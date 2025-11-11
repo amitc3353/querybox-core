@@ -199,7 +199,9 @@ class ChunkingService:
             if not isinstance(text, str):
                 raise ValueError("Text must be a string")
 
-            min_chars = self.config.min_tokens * 4  # Rough char estimate
+            # Allow documents as short as 50 characters (e.g., short notes, titles with brief descriptions)
+            # Instead of enforcing min_tokens * 4, use a more lenient threshold
+            min_chars = 50
             if len(text) < min_chars:
                 raise ValueError(
                     f"Text too short: {len(text)} chars (minimum: {min_chars})"

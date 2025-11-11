@@ -126,29 +126,83 @@ class Proposition(BaseModel):
 
 class Citation(BaseModel):
     """Source citation for answer claim"""
+    # Core fields (new schema)
+    chunk_id: Optional[str] = Field(None, description="Unique chunk identifier")
     document_id: str = Field(..., description="Source document UUID")
-    document_name: str = Field(..., description="Document display name")
-    passage_text: str = Field(..., max_length=1000, description="Cited passage text")
-    page: Optional[int] = Field(None, ge=1, description="Page number in source")
-    section: Optional[str] = Field(None, description="Section heading")
+    document_filename: Optional[str] = Field(None, description="Document display name")
+    content: Optional[str] = Field(None, max_length=1000, description="Cited passage text")
+    page_number: Optional[int] = Field(None, ge=1, description="Page number in source")
+    chunk_index: Optional[int] = Field(None, ge=0, description="Chunk index in document")
     relevance_score: float = Field(
         ...,
         ge=0.0,
         le=1.0,
         description="Relevance score of this passage"
     )
-    citation_number: int = Field(..., ge=1, description="Citation reference number [1], [2], etc.")
+    quality: Optional[str] = Field(None, description="Citation quality: STRONG, MEDIUM, or WEAK")
+    metadata: dict = Field(default_factory=dict, description="Additional metadata (file_type, upload_date, etc.)")
+
+    # Backward compatibility fields (for legacy tests and verification service)
+    document_name: Optional[str] = Field(None, description="Alias for document_filename (deprecated)")
+    passage_text: Optional[str] = Field(None, max_length=1000, description="Alias for content (deprecated)")
+    page: Optional[int] = Field(None, ge=1, description="Alias for page_number (deprecated)")
+    section: Optional[str] = Field(None, description="Section/heading in document (deprecated)")
+    citation_number: Optional[int] = Field(None, ge=1, description="Citation number in answer text (deprecated)")
+
+    def __init__(self, **data):
+        """Initialize with automatic field aliasing for backward compatibility"""
+        # If old fields are provided but not new ones, copy them over
+        if 'document_name' in data and 'document_filename' not in data:
+            data['document_filename'] = data['document_name']
+        if 'passage_text' in data and 'content' not in data:
+            data['content'] = data['passage_text']
+        if 'page' in data and 'page_number' not in data:
+            data['page_number'] = data['page']
+
+        # If new fields are provided but not old ones, copy them for backward compat
+        if 'document_filename' in data and 'document_name' not in data:
+            data['document_name'] = data['document_filename']
+        if 'content' in data and 'passage_text' not in data:
+            data['passage_text'] = data['content']
+        if 'page_number' in data and 'page' not in data:
+            data['page'] = data['page_number']
+
+        # Generate chunk_id if not provided
+        if 'chunk_id' not in data and 'document_id' in data:
+            chunk_idx = data.get('chunk_index', 0)
+            data['chunk_id'] = f"chunk_{data['document_id']}_{chunk_idx}"
+
+        # Set default chunk_index if not provided
+        if 'chunk_index' not in data:
+            data['chunk_index'] = 0
+
+        # Set default quality based on relevance_score if not provided
+        if 'quality' not in data and 'relevance_score' in data:
+            score = data['relevance_score']
+            if score >= 0.8:
+                data['quality'] = "STRONG"
+            elif score >= 0.6:
+                data['quality'] = "MEDIUM"
+            else:
+                data['quality'] = "WEAK"
+
+        super().__init__(**data)
 
     class Config:
         json_schema_extra = {
             "example": {
+                "chunk_id": "chunk_550e8400_0",
                 "document_id": "550e8400-e29b-41d4-a716-446655440000",
-                "document_name": "Return_Policy.pdf",
-                "passage_text": "Customers may return items within 30 days...",
-                "page": 1,
-                "section": "Return Policy",
+                "document_filename": "Return_Policy.pdf",
+                "content": "Customers may return items within 30 days...",
+                "page_number": 1,
+                "chunk_index": 0,
                 "relevance_score": 0.95,
-                "citation_number": 1
+                "quality": "STRONG",
+                "metadata": {
+                    "file_type": "pdf",
+                    "upload_date": "2025-11-10T12:00:00Z"
+                }
             }
         }
 

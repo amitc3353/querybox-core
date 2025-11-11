@@ -30,16 +30,15 @@ export function SearchInput({ onSearch, isLoading }: SearchInputProps) {
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<SearchFilters>({});
 
-  // Debounced search effect
-  useEffect(() => {
-    if (query.length < MIN_QUERY_LENGTH) return;
-
-    const timer = setTimeout(() => {
-      onSearch(query, strategy, filters);
-    }, 500); // 500ms debounce
-
-    return () => clearTimeout(timer);
-  }, [query, strategy, filters, onSearch]);
+  // Auto-search disabled - user must click Search button or press Enter
+  // If you want to re-enable auto-search on typing, uncomment this useEffect:
+  // useEffect(() => {
+  //   if (query.length < MIN_QUERY_LENGTH) return;
+  //   const timer = setTimeout(() => {
+  //     onSearch(query, strategy, filters);
+  //   }, 500);
+  //   return () => clearTimeout(timer);
+  // }, [query, strategy, filters]);
 
   const handleSearch = () => {
     if (query.length >= MIN_QUERY_LENGTH) {

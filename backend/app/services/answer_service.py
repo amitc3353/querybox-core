@@ -9,6 +9,7 @@ import time
 import hashlib
 import logging
 import tiktoken
+from datetime import datetime
 from typing import List, Optional, Dict, Any, Tuple
 from fastapi import HTTPException, status as http_status
 from redis import Redis
@@ -136,7 +137,7 @@ class AnswerService:
             # Step 1: Check cache
             cache_key = self._get_cache_key(request)
             if self.redis_client:
-                cached = self._get_cached_answer(cache_key)
+                cached = await self._get_cached_answer(cache_key)
                 if cached:
                     logger.info(f"Cache hit for query hash: {cache_key}")
                     return cached
@@ -225,7 +226,7 @@ class AnswerService:
 
             # Step 10: Cache result
             if self.redis_client:
-                self._cache_answer(cache_key, response)
+                await self._cache_answer(cache_key, response)
 
             logger.info(
                 f"Answer generated successfully: "
@@ -501,16 +502,39 @@ class AnswerService:
         """
         citations = []
 
-        for i, passage in enumerate(passages, start=1):
+        for i, passage in enumerate(passages):
+            # Generate chunk_id from document_id and chunk_index
+            chunk_index = passage.chunk_index if passage.chunk_index is not None else i
+            chunk_id = f"chunk_{passage.document_id}_{chunk_index}"
+
+            # Determine citation quality based on relevance score
+            if passage.rerank_score >= 0.8:
+                quality = "STRONG"
+            elif passage.rerank_score >= 0.6:
+                quality = "MEDIUM"
+            else:
+                quality = "WEAK"
+
+            # Extract file extension from document name
+            file_type = "unknown"
+            if "." in passage.document_name:
+                file_type = passage.document_name.split(".")[-1].lower()
+
             citations.append(
                 Citation(
+                    chunk_id=chunk_id,
                     document_id=passage.document_id,
-                    document_name=passage.document_name,
-                    passage_text=passage.text[:1000],  # Limit to 1000 chars
-                    page=passage.page,
-                    section=passage.section,
+                    document_filename=passage.document_name,
+                    content=passage.text[:1000],  # Limit to 1000 chars
+                    page_number=passage.page,
+                    chunk_index=chunk_index,
                     relevance_score=passage.rerank_score,
-                    citation_number=i
+                    quality=quality,
+                    citation_number=i + 1,  # Add citation number (1-indexed)
+                    metadata={
+                        "file_type": file_type,
+                        "upload_date": datetime.now().isoformat()
+                    }
                 )
             )
 
@@ -589,7 +613,7 @@ class AnswerService:
 
         return hashlib.sha256(cache_input.encode()).hexdigest()
 
-    def _get_cached_answer(self, cache_key: str) -> Optional[AnswerResponse]:
+    async def _get_cached_answer(self, cache_key: str) -> Optional[AnswerResponse]:
         """
         Get cached answer if exists
 
@@ -601,7 +625,7 @@ class AnswerService:
         """
         try:
             import json
-            cached_json = self.redis_client.get(f"answer:{cache_key}")
+            cached_json = await self.redis_client.get(f"answer:{cache_key}")
 
             if cached_json:
                 data = json.loads(cached_json)
@@ -614,7 +638,7 @@ class AnswerService:
             logger.warning(f"Cache get error: {e}")
             return None
 
-    def _cache_answer(self, cache_key: str, response: AnswerResponse):
+    async def _cache_answer(self, cache_key: str, response: AnswerResponse):
         """
         Cache answer response
 
@@ -625,7 +649,7 @@ class AnswerService:
         try:
             import json
             cache_data = response.model_dump()
-            self.redis_client.setex(
+            await self.redis_client.setex(
                 f"answer:{cache_key}",
                 self.CACHE_TTL_SECONDS,
                 json.dumps(cache_data)

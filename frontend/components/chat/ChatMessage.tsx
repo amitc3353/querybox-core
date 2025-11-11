@@ -1,6 +1,7 @@
 'use client';
 
-import { User, Bot, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { useState } from 'react';
+import { User, Bot, ThumbsUp, ThumbsDown, ChevronDown, ChevronUp } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,7 @@ interface ChatMessageProps {
 export function ChatMessage({ message, onFeedback, onViewDocument }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const confidenceScore = message.confidence_score || 0;
+  const [citationsExpanded, setCitationsExpanded] = useState(false);
 
   // Helper to get confidence color and label
   const getConfidenceInfo = (score: number) => {
@@ -95,22 +97,43 @@ export function ChatMessage({ message, onFeedback, onViewDocument }: ChatMessage
             </CardContent>
           </Card>
 
-          {/* Citations */}
+          {/* Citations - Collapsible */}
           {message.citations && message.citations.length > 0 && (
-            <div className="space-y-3 mb-4" role="region" aria-label="Answer sources">
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Sources ({message.citations.length})
-              </h4>
-              <div className="space-y-2">
-                {message.citations.map((citation, index) => (
-                  <CitationCard
-                    key={citation.chunk_id}
-                    citation={citation}
-                    index={index}
-                    onViewDocument={onViewDocument}
-                  />
-                ))}
-              </div>
+            <div className="mb-4" role="region" aria-label="Answer sources">
+              <button
+                onClick={() => setCitationsExpanded(!citationsExpanded)}
+                className="flex items-center justify-between w-full px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+                aria-expanded={citationsExpanded}
+                aria-controls={`citations-${message.id}`}
+              >
+                <div className="flex items-center gap-2">
+                  <span>Sources ({message.citations.length})</span>
+                  <Badge variant="outline" className="text-xs">
+                    View references
+                  </Badge>
+                </div>
+                {citationsExpanded ? (
+                  <ChevronUp className="w-4 h-4 text-gray-500" aria-hidden="true" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-gray-500" aria-hidden="true" />
+                )}
+              </button>
+
+              {citationsExpanded && (
+                <div
+                  id={`citations-${message.id}`}
+                  className="mt-3 space-y-2 animate-in slide-in-from-top-2 duration-200"
+                >
+                  {message.citations.map((citation, index) => (
+                    <CitationCard
+                      key={`${citation.chunk_id}-${index}`}
+                      citation={citation}
+                      index={index}
+                      onViewDocument={onViewDocument}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

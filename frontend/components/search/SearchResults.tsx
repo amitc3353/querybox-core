@@ -106,18 +106,22 @@ export function SearchResults({
                     </div>
 
                     <div className="flex items-center gap-2 flex-wrap text-sm text-gray-500">
-                      <Badge variant="outline" className="text-xs">
-                        {FILE_TYPE_LABELS[`.${result.metadata.file_type}`] ||
-                         result.metadata.file_type.toUpperCase()}
-                      </Badge>
+                      {result.metadata?.file_type && (
+                        <Badge variant="outline" className="text-xs">
+                          {FILE_TYPE_LABELS[`.${result.metadata.file_type}`] ||
+                           result.metadata.file_type.toUpperCase()}
+                        </Badge>
+                      )}
 
                       {result.page_number && (
                         <span className="text-xs">Page {result.page_number}</span>
                       )}
 
-                      <span className="text-xs">Chunk {result.chunk_index + 1}</span>
+                      {result.chunk_index !== undefined && (
+                        <span className="text-xs">Chunk {result.chunk_index + 1}</span>
+                      )}
 
-                      {result.metadata.upload_date && (
+                      {result.metadata?.upload_date && (
                         <span className="text-xs hidden sm:inline">
                           {formatDate(result.metadata.upload_date, 'MMM d, yyyy')}
                         </span>
@@ -173,6 +177,10 @@ export function SearchResults({
                   <Button
                     size="sm"
                     variant="ghost"
+                    onClick={() => {
+                      // Navigate to documents page with this document selected
+                      window.location.href = `/documents?id=${result.document_id}`;
+                    }}
                     className="w-full sm:w-auto sm:ml-auto"
                   >
                     <ExternalLink className="w-4 h-4 mr-1.5" />

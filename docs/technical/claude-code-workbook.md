@@ -37,6 +37,20 @@
 - `/dev-docs-update` before context limits hit
 - `/test-all` before commits/PRs
 
+##  Good times to run /dev-docs-update:
+  - After Day 2 (completed setup + API client)
+  - After Day 5 (completed document management)
+  - After Day 7 (completed search interface)
+  - After Day 11 (completed analytics)
+  - End of each major feature
+  - Before switching context to backend work
+
+    Run /dev-docs-update when:
+  ✓ End of coding session on large feature
+  ✓ Switching to different feature
+  ✓ Before taking a break from multi-day feature
+  ✓ After completing a major milestone (e.g., finished Day 1-2 tasks)
+
 **Review Skill Suggestions**
 - When you see "🎯 SKILL ACTIVATION CHECK", acknowledge it
 - Skills contain QueryBox-specific patterns Claude should follow

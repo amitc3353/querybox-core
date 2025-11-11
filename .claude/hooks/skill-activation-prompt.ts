@@ -41,6 +41,16 @@ export async function userPromptSubmit(
   context: any
 ): Promise<string> {
   try {
+    // Validate inputs
+    if (!prompt || typeof prompt !== 'string') {
+      return prompt || '';
+    }
+
+    // Ensure context is an object
+    if (!context || typeof context !== 'object') {
+      context = {};
+    }
+
     // Load skill rules
     const skillRulesPath = path.join(process.cwd(), '.claude/skills/skill-rules.json');
 
@@ -87,7 +97,7 @@ User request: ${prompt}`;
     return reminder;
   } catch (error) {
     // If hook fails, don't block the user - just return original prompt
-    console.error('Skill activation hook error:', error);
+    // Silently fail to avoid "hook error" messages in logs
     return prompt;
   }
 }
@@ -122,7 +132,7 @@ function shouldActivateSkill(
   }
 
   // Check file context if available
-  if (context.currentFile) {
+  if (context && context.currentFile) {
     // Check if current file matches path patterns
     for (const pathPattern of rule.fileTriggers.pathPatterns) {
       const regex = pathPatternToRegex(pathPattern);
@@ -151,7 +161,7 @@ function shouldActivateSkill(
   }
 
   // Check recent files context
-  if (context.recentFiles && Array.isArray(context.recentFiles)) {
+  if (context && context.recentFiles && Array.isArray(context.recentFiles)) {
     for (const file of context.recentFiles) {
       for (const pathPattern of rule.fileTriggers.pathPatterns) {
         const regex = pathPatternToRegex(pathPattern);

@@ -163,8 +163,9 @@ class Settings(BaseSettings):
     # ========================================
     # Ollama LLM Configuration (Step 11.1)
     # ========================================
+    # Available Models: tinyllama:latest (637MB, active), qwen2:7b (4.4GB, requires more RAM)
     OLLAMA_BASE_URL: str = "http://localhost:11434"
-    OLLAMA_MODEL: str = "qwen2:7b"
+    OLLAMA_MODEL: str = "tinyllama"  # Active model (optimized for limited memory)
     OLLAMA_TIMEOUT: int = 60  # Timeout in seconds
     OLLAMA_TEMPERATURE: float = 0.2  # Default temperature for answer generation
     OLLAMA_MAX_TOKENS: int = 2000  # Maximum tokens for completion
@@ -256,6 +257,7 @@ class Settings(BaseSettings):
     # Better Stack (Logtail) Logging Configuration (Step 13.5)
     # ========================================
     LOGTAIL_SOURCE_TOKEN: Optional[str] = None
+    LOGTAIL_HOST: str = "in.logs.betterstack.com"  # US endpoint (default) or EU: s{source_id}.eu-nbg-2.betterstackdata.com
     LOGTAIL_ENABLED: bool = True
     LOG_LEVEL: str = "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
 

@@ -180,9 +180,9 @@ def chunk_document_text(self, document_id: str):
                 "document_id": document_id,
             }
 
-        # Validate text length
-        if not document_text.full_text or document_text.text_length < 100:
-            error_msg = f"Document text too short for chunking ({document_text.text_length} chars)"
+        # Validate text length (must have at least 50 chars to be meaningful)
+        if not document_text.full_text or document_text.text_length < 50:
+            error_msg = f"Document text too short for chunking ({document_text.text_length} chars, minimum: 50)"
             logger.warning(f"{error_msg} for document {document_id}")
 
             run_async(tracker.mark_stage_failed(
@@ -221,8 +221,14 @@ def chunk_document_text(self, document_id: str):
                 error_message=result.error_message or "Chunking failed",
             ))
 
-            # Retry if possible
-            if self.request.retries < self.max_retries:
+            # Don't retry validation errors (e.g., "Text too short") - they won't be fixed by retrying
+            is_validation_error = result.error_message and (
+                "too short" in result.error_message.lower() or
+                "must be a string" in result.error_message.lower()
+            )
+
+            # Retry if possible and not a validation error
+            if not is_validation_error and self.request.retries < self.max_retries:
                 logger.info(f"Retrying chunking for document {document_id}")
                 raise self.retry(exc=Exception(result.error_message))
 

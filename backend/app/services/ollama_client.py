@@ -3,6 +3,23 @@ Ollama Client Service for Step 11.1 - LLM Integration
 
 Handles communication with Ollama server for answer generation.
 Implements retry logic and health monitoring.
+
+Available Models (Downloaded):
+    1. tinyllama:latest (637 MB) - ✅ ACTIVE
+       - Lightweight model optimized for systems with limited memory
+       - Fast inference with reasonable quality
+       - Recommended for development and memory-constrained environments
+
+    2. qwen2:7b (4.4 GB) - ⚠️ INACTIVE
+       - Higher quality model but requires ~8GB RAM
+       - Causes OOM errors on systems with limited memory
+       - Switch to this model when more RAM is available
+
+Current Configuration: tinyllama:latest
+
+To switch models, update:
+    - backend/app/core/config.py: OLLAMA_MODEL
+    - This file: OllamaClient.__init__() default model parameter
 """
 import httpx
 import time
@@ -47,7 +64,7 @@ class OllamaClient:
         self,
         base_url: str = "http://localhost:11434",
         timeout: float = 60.0,
-        model: str = "qwen2:7b"
+        model: str = "tinyllama"
     ):
         """
         Initialize Ollama client

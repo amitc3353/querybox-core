@@ -1,8 +1,16 @@
-.PHONY: help setup run migrate migration-create migration-history migration-current test clean docker-up docker-down install lint format seed-demo demo-setup health
+.PHONY: help setup run migrate migration-create migration-history migration-current test clean docker-up docker-down install lint format seed-demo demo-setup health kill-all restart dev-frontend kill-frontend
 
 # Default target
 help:
 	@echo "QueryBox Core - Available commands:"
+	@echo ""
+	@echo "🚀 Quick Start:"
+	@echo "  kill-all           - Kill all running services (backend/celery/frontend)"
+	@echo "  restart            - Kill all services and restart fresh (full rebuild)"
+	@echo "  dev-frontend       - Start frontend dev server (Next.js)"
+	@echo "  kill-frontend      - Kill frontend dev server"
+	@echo ""
+	@echo "🔧 Development:"
 	@echo "  setup              - Set up the development environment"
 	@echo "  install            - Install Python dependencies"
 	@echo "  run                - Start the FastAPI development server"
@@ -13,11 +21,17 @@ help:
 	@echo "  test               - Run tests"
 	@echo "  lint               - Run linting (flake8, mypy)"
 	@echo "  format             - Format code (black, isort)"
+	@echo ""
+	@echo "🐳 Docker:"
 	@echo "  docker-up          - Start all services with Docker Compose"
 	@echo "  docker-down        - Stop all Docker services"
+	@echo ""
+	@echo "🌱 Demo & Health:"
 	@echo "  seed-demo          - Seed demo data (5 sample documents)"
 	@echo "  demo-setup         - Full demo setup (Docker + migrations + seed)"
 	@echo "  health             - Check health status of all services"
+	@echo ""
+	@echo "🧹 Maintenance:"
 	@echo "  clean              - Clean up cache and temporary files"
 
 # Set up development environment
@@ -146,3 +160,56 @@ health:
 	@docker exec querybox_postgres pg_isready -U querybox -d querybox > /dev/null 2>&1 && echo "✅ PostgreSQL healthy" || echo "❌ PostgreSQL not healthy"
 	@docker exec querybox_redis redis-cli ping > /dev/null 2>&1 && echo "✅ Redis healthy" || echo "❌ Redis not healthy"
 	@curl -s http://localhost:9000/minio/health/live > /dev/null 2>&1 && echo "✅ MinIO healthy" || echo "❌ MinIO not healthy"
+
+# Kill all running services
+kill-all:
+	@echo "🛑 Killing all services..."
+	@echo "   - Stopping backend (uvicorn on port 8000)..."
+	@-lsof -ti:8000 | xargs kill -9 2>/dev/null || true
+	@echo "   - Stopping frontend (Next.js on port 3000)..."
+	@-lsof -ti:3000 | xargs kill -9 2>/dev/null || true
+	@echo "   - Stopping Celery workers..."
+	@-pkill -f "celery.*worker" 2>/dev/null || true
+	@echo "   - Stopping Celery beat..."
+	@-pkill -f "celery.*beat" 2>/dev/null || true
+	@echo "✅ All services stopped"
+
+# Kill frontend only
+kill-frontend:
+	@echo "🛑 Killing frontend (Next.js)..."
+	@-lsof -ti:3000 | xargs kill -9 2>/dev/null || true
+	@echo "✅ Frontend stopped"
+
+# Start frontend dev server
+dev-frontend:
+	@echo "🚀 Starting Next.js frontend..."
+	cd frontend && npm run dev
+
+# Full restart - kill all and rebuild
+restart: kill-all
+	@echo ""
+	@echo "♻️  Restarting all services..."
+	@echo ""
+	@echo "🐳 Starting Docker services (postgres, redis, minio)..."
+	@make docker-up
+	@echo ""
+	@echo "⏳ Waiting for Docker services to be ready..."
+	@sleep 5
+	@echo ""
+	@echo "🚀 Starting backend server on http://localhost:8000..."
+	@echo "   (Run in new terminal: make run)"
+	@echo ""
+	@echo "🚀 Starting frontend server on http://localhost:3000..."
+	@echo "   (Run in new terminal: make dev-frontend)"
+	@echo ""
+	@echo "========================================"
+	@echo "✅ Services Ready to Start!"
+	@echo "========================================"
+	@echo "Run these commands in separate terminals:"
+	@echo "  Terminal 1: make run           (backend)"
+	@echo "  Terminal 2: make dev-frontend  (frontend)"
+	@echo ""
+	@echo "Or run both in background:"
+	@echo "  make run &"
+	@echo "  make dev-frontend &"
+	@echo "========================================"

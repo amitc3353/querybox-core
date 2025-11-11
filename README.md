@@ -66,7 +66,48 @@ docker-compose up -d
 - Backend API: http://localhost:8000
 - API Docs: http://localhost:8000/docs
 
-### Development Setup
+### Quick Commands (Recommended)
+
+**Using the dev.sh helper script:**
+```bash
+# Make executable (first time only)
+chmod +x dev.sh
+
+# Kill all services (backend/frontend/celery)
+./dev.sh kill
+
+# Full restart (kill + restart Docker + ready to start services)
+./dev.sh restart
+
+# Check service status
+./dev.sh status
+
+# Start backend only
+./dev.sh backend
+
+# Start frontend only
+./dev.sh frontend
+```
+
+**Using Make commands:**
+```bash
+# Show all available commands
+make help
+
+# Kill all services
+make kill-all
+
+# Full restart
+make restart
+
+# Start backend
+make run
+
+# Start frontend
+make dev-frontend
+```
+
+### Development Setup (Manual)
 
 **Backend:**
 ```bash
