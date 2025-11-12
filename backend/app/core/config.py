@@ -22,7 +22,16 @@ class Settings(BaseSettings):
     # AI/Embeddings
     OPENAI_API_KEY: Optional[str] = None
 
-    # BGE-M3 Embedding Configuration
+    # ========================================
+    # OpenAI Embedding Configuration (Phase 3)
+    # ========================================
+    OPENAI_EMBEDDING_MODEL: str = "text-embedding-3-small"  # or text-embedding-3-large
+    OPENAI_EMBEDDING_DIMENSION: int = 1536  # 1536 for small, 3072 for large
+    OPENAI_EMBEDDING_BATCH_SIZE: int = 100  # Number of texts per API call
+
+    # ========================================
+    # BGE-M3 Embedding Configuration (Local)
+    # ========================================
     EMBEDDING_MODEL_NAME: str = "BAAI/bge-m3"
     EMBEDDING_DIMENSION: int = 1024
     EMBEDDING_MAX_TOKENS: int = 8192
@@ -186,6 +195,25 @@ class Settings(BaseSettings):
     OLLAMA_TEMPERATURE: float = 0.2  # Default temperature for answer generation
     OLLAMA_MAX_TOKENS: int = 2000  # Maximum tokens for completion
     OLLAMA_CONTEXT_TOKENS: int = 6000  # Maximum tokens for context passages
+
+    # ========================================
+    # OpenRouter LLM Configuration (Phase 3)
+    # ========================================
+    # OpenRouter provides access to multiple LLMs (GPT, Claude, Gemini, Llama)
+    # Sign up at: https://openrouter.ai/
+    OPENROUTER_API_KEY: Optional[str] = None  # Required for OpenRouter (sk-or-v1-...)
+    OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
+    OPENROUTER_MODEL: str = "openai/gpt-4o-mini"  # Default model (fast + affordable)
+    OPENROUTER_APP_NAME: str = "QueryBox Core"  # App name (for OpenRouter rankings)
+    OPENROUTER_SITE_URL: Optional[str] = None  # Optional site URL (for rankings)
+
+    # Available OpenRouter Models:
+    # - openai/gpt-4o-mini (recommended: $0.15/$0.60 per 1M tokens, 128k context)
+    # - openai/gpt-4o ($2.50/$10.00 per 1M tokens, 128k context, highest quality)
+    # - anthropic/claude-3.5-sonnet ($3/$15 per 1M tokens, 200k context)
+    # - anthropic/claude-3-haiku ($0.25/$1.25 per 1M tokens, 200k context, fastest)
+    # - google/gemini-2.0-flash-exp (FREE during preview, 1M context)
+    # - meta-llama/llama-3.1-405b ($2.70 per 1M tokens, 128k context)
 
     # Security
     API_KEY: str = "dev-key-12345"

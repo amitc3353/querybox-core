@@ -51,11 +51,17 @@ def get_llm_provider(provider_name: Optional[str] = None) -> LLMProvider:
     if name == "ollama":
         return OllamaProvider()
 
+    elif name == "openrouter":
+        from app.services.llm.openrouter_provider import OpenRouterProvider
+        return OpenRouterProvider(
+            api_key=settings.OPENROUTER_API_KEY,
+            base_url=settings.OPENROUTER_BASE_URL,
+            model=settings.OPENROUTER_MODEL,
+            app_name=settings.OPENROUTER_APP_NAME,
+            site_url=settings.OPENROUTER_SITE_URL,
+        )
+
     # Future providers (uncomment when implemented):
-    # elif name == "openrouter":
-    #     from app.services.llm.openrouter_provider import OpenRouterProvider
-    #     return OpenRouterProvider()
-    #
     # elif name == "openai":
     #     from app.services.llm.openai_provider import OpenAIProvider
     #     return OpenAIProvider()
@@ -65,7 +71,7 @@ def get_llm_provider(provider_name: Optional[str] = None) -> LLMProvider:
     #     return ClaudeProvider()
 
     else:
-        available = ["ollama"]  # Add others as implemented
+        available = ["ollama", "openrouter"]
         raise ValueError(
             f"Unknown LLM provider: '{name}'. "
             f"Available options: {', '.join(available)}"
@@ -79,4 +85,4 @@ def get_available_llm_providers() -> list[str]:
     Returns:
         List of provider names that can be used with get_llm_provider()
     """
-    return ["ollama"]  # Add others as implemented
+    return ["ollama", "openrouter"]

@@ -7,6 +7,7 @@ Tests:
 - Provider override works
 - Available providers list is correct
 - LLMResponse dataclass works correctly
+- OpenRouter provider support (Phase 3)
 """
 import pytest
 from unittest.mock import patch, AsyncMock
@@ -14,6 +15,7 @@ from unittest.mock import patch, AsyncMock
 from app.services.llm.factory import get_llm_provider, get_available_llm_providers
 from app.services.llm.base import LLMProvider, LLMResponse
 from app.services.llm.ollama_provider import OllamaProvider
+from app.services.llm.openrouter_provider import OpenRouterProvider
 
 
 class TestLLMFactory:
@@ -52,7 +54,8 @@ class TestLLMFactory:
         providers = get_available_llm_providers()
         assert isinstance(providers, list)
         assert "ollama" in providers
-        assert len(providers) >= 1
+        assert "openrouter" in providers
+        assert len(providers) >= 2
 
     def test_provider_is_new_instance(self):
         """Test each factory call creates a new instance"""
@@ -60,6 +63,19 @@ class TestLLMFactory:
         provider2 = get_llm_provider()
         # Should be different instances
         assert provider1 is not provider2
+
+    @patch('app.core.config.settings')
+    def test_get_provider_openrouter(self, mock_settings):
+        """Test factory returns OpenRouter when configured"""
+        mock_settings.OPENROUTER_API_KEY = "test-key"
+        mock_settings.OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+        mock_settings.OPENROUTER_MODEL = "openai/gpt-4o-mini"
+        mock_settings.OPENROUTER_APP_NAME = "Test App"
+        mock_settings.OPENROUTER_SITE_URL = None
+
+        provider = get_llm_provider("openrouter")
+        assert isinstance(provider, OpenRouterProvider)
+        assert isinstance(provider, LLMProvider)
 
 
 class TestLLMProviderInterface:
@@ -84,6 +100,30 @@ class TestLLMProviderInterface:
         model_name = provider.get_model_name()
         assert isinstance(model_name, str)
         assert len(model_name) > 0
+
+    def test_openrouter_provider_has_required_methods(self):
+        """Test OpenRouterProvider implements all abstract methods"""
+        provider = OpenRouterProvider(api_key="test-key")
+
+        # Check required methods exist
+        assert hasattr(provider, 'generate')
+        assert callable(provider.generate)
+        assert hasattr(provider, 'generate_with_messages')
+        assert callable(provider.generate_with_messages)
+        assert hasattr(provider, 'get_metadata')
+        assert callable(provider.get_metadata)
+
+    def test_openrouter_provider_metadata(self):
+        """Test OpenRouterProvider has correct metadata"""
+        provider = OpenRouterProvider(
+            api_key="test-key",
+            model="openai/gpt-4o-mini"
+        )
+        metadata = provider.get_metadata()
+        assert metadata['provider'] == 'openrouter'
+        assert metadata['model'] == 'openai/gpt-4o-mini'
+        assert 'context_window' in metadata
+        assert 'default_temperature' in metadata
 
 
 class TestLLMResponse:
