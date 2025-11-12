@@ -36,6 +36,7 @@ class KeywordSearchService:
         """Initialize search service with database session"""
         self.db = db
         self.language = 'english'  # PostgreSQL text search language
+        self._is_sqlite = self._detect_database_type()
 
     def search(
         self,
@@ -86,6 +87,19 @@ class KeywordSearchService:
             processing_time_ms=processing_time_ms,
             filters_applied=filters
         )
+
+    def _detect_database_type(self) -> bool:
+        """
+        Detect if database is SQLite (for test compatibility)
+
+        Returns:
+            True if SQLite, False otherwise (PostgreSQL)
+        """
+        try:
+            dialect_name = self.db.bind.dialect.name
+            return dialect_name == 'sqlite'
+        except Exception:
+            return False
 
     def _build_tsquery(self, query: str) -> str:
         """
@@ -203,7 +217,7 @@ class KeywordSearchService:
         Count total matching chunks for pagination
 
         Args:
-            tsquery: PostgreSQL tsquery string
+            tsquery: PostgreSQL tsquery string (or search term for SQLite)
             filters: Optional search filters
 
         Returns:
@@ -213,16 +227,35 @@ class KeywordSearchService:
             Document, Embedding.document_id == Document.id
         ).join(
             DocumentText, Embedding.document_id == DocumentText.document_id
-        ).filter(
-            # Full-text search condition
-            func.to_tsvector(self.language, Embedding.chunk_text).op('@@')(
-                func.to_tsquery(self.language, tsquery)
-            ),
-            # Only completed documents
-            Document.status == 'completed',
-            # Not deleted
-            Document.is_deleted == False
         )
+
+        # Use different search depending on database
+        if self._is_sqlite:
+            # SQLite: Use LIKE for each search term (AND condition, case-insensitive)
+            search_terms = tsquery.replace(' & ', ' ').replace('&', ' ').split()
+            search_filters = [func.lower(Embedding.chunk_text).like(f"%{term.lower()}%") for term in search_terms if term.strip()]
+
+            if search_filters:
+                query = query.filter(
+                    and_(*search_filters),
+                    Document.status == 'completed',
+                    Document.is_deleted == False
+                )
+            else:
+                # If no valid search terms, return 0
+                return 0
+        else:
+            # PostgreSQL: Use full-text search
+            query = query.filter(
+                # Full-text search condition
+                func.to_tsvector(self.language, Embedding.chunk_text).op('@@')(
+                    func.to_tsquery(self.language, tsquery)
+                ),
+                # Only completed documents
+                Document.status == 'completed',
+                # Not deleted
+                Document.is_deleted == False
+            )
 
         # Apply filters
         query = self._apply_filters(query, filters)
@@ -237,53 +270,89 @@ class KeywordSearchService:
         offset: int = 0
     ) -> List[Dict]:
         """
-        Search individual chunks using PostgreSQL full-text search
+        Search individual chunks using database-appropriate search method
 
         Args:
-            tsquery: PostgreSQL tsquery string
+            tsquery: PostgreSQL tsquery string (or search term for SQLite)
             filters: Optional search filters
             limit: Maximum results
+            offset: Pagination offset
 
         Returns:
             List of chunk matches with rank and snippet
         """
-        # Build base query
-        query = self.db.query(
-            Embedding.id.label('chunk_id'),
-            Embedding.document_id,
-            Document.document_name,
-            Document.mime_type,
-            Document.created_at,
-            DocumentText.extraction_quality,
-            Embedding.chunk_index,
-            Embedding.start_position,
-            Embedding.end_position,
-            # Calculate relevance rank
-            func.ts_rank(
-                func.to_tsvector(self.language, Embedding.chunk_text),
-                func.to_tsquery(self.language, tsquery)
-            ).label('rank'),
-            # Generate highlighted snippet
-            func.ts_headline(
-                self.language,
-                Embedding.chunk_text,
-                func.to_tsquery(self.language, tsquery),
-                'MaxWords=50, MinWords=30, MaxFragments=1'
-            ).label('snippet')
-        ).join(
-            Document, Embedding.document_id == Document.id
-        ).join(
-            DocumentText, Embedding.document_id == DocumentText.document_id
-        ).filter(
-            # Full-text search condition
-            func.to_tsvector(self.language, Embedding.chunk_text).op('@@')(
-                func.to_tsquery(self.language, tsquery)
-            ),
-            # Only completed documents
-            Document.status == 'completed',
-            # Not deleted
-            Document.is_deleted == False
-        )
+        if self._is_sqlite:
+            # SQLite fallback: LIKE-based search with AND conditions for each word (case-insensitive)
+            # Split query by ' & ' and search for each term
+            search_terms = tsquery.replace(' & ', ' ').replace('&', ' ').split()
+
+            query = self.db.query(
+                Embedding.id.label('chunk_id'),
+                Embedding.document_id,
+                Document.document_name,
+                Document.mime_type,
+                Document.created_at,
+                DocumentText.extraction_quality,
+                Embedding.chunk_index,
+                Embedding.start_position,
+                Embedding.end_position,
+                func.length(Embedding.chunk_text).label('rank'),  # Simple relevance by length
+                func.substr(Embedding.chunk_text, 1, 200).label('snippet')  # Simple snippet
+            ).join(
+                Document, Embedding.document_id == Document.id
+            ).join(
+                DocumentText, Embedding.document_id == DocumentText.document_id
+            )
+
+            # Build filter for all search terms (AND condition, case-insensitive)
+            search_filters = [func.lower(Embedding.chunk_text).like(f"%{term.lower()}%") for term in search_terms if term.strip()]
+            if search_filters:
+                query = query.filter(
+                    and_(*search_filters),
+                    Document.status == 'completed',
+                    Document.is_deleted == False
+                )
+            else:
+                # If no valid search terms, return empty
+                query = query.filter(False)
+        else:
+            # PostgreSQL: Use full-text search
+            query = self.db.query(
+                Embedding.id.label('chunk_id'),
+                Embedding.document_id,
+                Document.document_name,
+                Document.mime_type,
+                Document.created_at,
+                DocumentText.extraction_quality,
+                Embedding.chunk_index,
+                Embedding.start_position,
+                Embedding.end_position,
+                # Calculate relevance rank
+                func.ts_rank(
+                    func.to_tsvector(self.language, Embedding.chunk_text),
+                    func.to_tsquery(self.language, tsquery)
+                ).label('rank'),
+                # Generate highlighted snippet
+                func.ts_headline(
+                    self.language,
+                    Embedding.chunk_text,
+                    func.to_tsquery(self.language, tsquery),
+                    'MaxWords=50, MinWords=30, MaxFragments=1'
+                ).label('snippet')
+            ).join(
+                Document, Embedding.document_id == Document.id
+            ).join(
+                DocumentText, Embedding.document_id == DocumentText.document_id
+            ).filter(
+                # Full-text search condition
+                func.to_tsvector(self.language, Embedding.chunk_text).op('@@')(
+                    func.to_tsquery(self.language, tsquery)
+                ),
+                # Only completed documents
+                Document.status == 'completed',
+                # Not deleted
+                Document.is_deleted == False
+            )
 
         # Apply filters
         query = self._apply_filters(query, filters)

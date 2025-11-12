@@ -305,6 +305,104 @@ class Settings(BaseSettings):
     LOGTAIL_ENABLED: bool = True
     LOG_LEVEL: str = "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
 
+    # ========================================
+    # Docling Parser Optimization (Phase 2.1)
+    # ========================================
+
+    # Device Selection
+    DOCLING_DEVICE: str = "auto"  # Options: auto, cpu, cuda, mps
+    DOCLING_ENABLE_MPS: bool = False  # Apple Silicon GPU (experimental, disabled due to EasyOCR compatibility)
+    DOCLING_NUM_THREADS: int = 8  # CPU threads for parallel processing
+
+    # Parallel Processing (ThreadedPdfPipeline)
+    DOCLING_USE_THREADED_PIPELINE: bool = True  # Use ThreadedPdfPipeline (5-stage parallel processing)
+    DOCLING_OCR_BATCH_SIZE: int = 4  # EasyOCR batch size: 4 for CPU, 64 for GPU
+    DOCLING_LAYOUT_BATCH_SIZE: int = 4  # Layout model batch size: 4 for CPU, 64 for GPU
+    DOCLING_TABLE_BATCH_SIZE: int = 4  # Table extraction batch size: 4 for CPU, 64 for GPU
+
+    # Model Loading Strategy
+    DOCLING_EAGER_INIT: bool = True  # Initialize models on service startup (avoid first-request latency)
+    DOCLING_WARMUP_ON_STARTUP: bool = True  # Warm up models with dummy PDF on startup
+
+    # Large PDF Handling (100+ pages)
+    DOCLING_PAGE_BATCH_SIZE: int = 50  # Pages per batch for memory-efficient processing
+    DOCLING_MAX_PAGES_MEMORY_THRESHOLD: int = 100  # Switch to batch mode above this page count
+
+    # Performance Tuning
+    DOCLING_ENABLE_PERFORMANCE_LOGGING: bool = True  # Log detailed performance metrics
+    DOCLING_LOG_GPU_MEMORY: bool = True  # Log GPU memory usage (if GPU available)
+
+    # ========================================
+    # Vision API Configuration (Phase 2.4)
+    # ========================================
+    # GPT-4o-mini Vision API for chart/graph interpretation
+
+    # Enable/Disable Vision Processing
+    ENABLE_VISION_PARSING: bool = True  # Master switch for vision API
+    VISION_PARSE_IMAGES_IN_DOCS: bool = True  # Extract and interpret images from documents
+
+    # Vision API Model Selection
+    VISION_API_MODEL: str = "gpt-4o-mini"  # OpenAI vision model (gpt-4o-mini, gpt-4o, gpt-4-vision-preview)
+    VISION_API_MAX_TOKENS: int = 500  # Max tokens for vision API response
+    VISION_API_TEMPERATURE: float = 0.2  # Lower = more deterministic
+
+    # Image Processing
+    VISION_API_MAX_IMAGES_PER_DOC: int = 20  # Max images to process per document (cost control)
+    VISION_IMAGE_MAX_SIZE: int = 2048  # Max image dimension (pixels) for Vision API
+    VISION_IMAGE_QUALITY: str = "auto"  # Options: "auto", "low", "high"
+
+    # Cost Tracking
+    VISION_ENABLE_COST_TRACKING: bool = True  # Track API usage and costs
+    VISION_COST_PER_IMAGE: float = 0.0005  # Est. cost per image with gpt-4o-mini
+    VISION_MAX_COST_PER_DOC: float = 0.10  # Max spend per document ($0.10 = 200 images)
+    VISION_WARN_COST_THRESHOLD: float = 0.05  # Warn if cost exceeds this per doc
+
+    # Performance
+    VISION_API_TIMEOUT_SECONDS: int = 30  # Timeout for vision API calls
+    VISION_API_MAX_RETRIES: int = 2  # Number of retries on failure
+    VISION_ENABLE_CACHING: bool = True  # Cache vision results (avoid reprocessing)
+    VISION_CACHE_TTL_SECONDS: int = 86400  # 24 hours cache
+
+    # ========================================
+    # Smart Router Configuration (Phase 2.3)
+    # ========================================
+    # Intelligent document routing that automatically selects optimal parser(s)
+    # based on document characteristics (images, tables, complexity)
+
+    # Enable/Disable Smart Router
+    SMART_ROUTER_ENABLED: bool = True  # Master switch for smart routing
+
+    # Document Analysis Thresholds
+    SMART_ROUTER_IMAGE_THRESHOLD: int = 3  # Min images to trigger Vision API
+    SMART_ROUTER_MIN_IMAGE_SIZE_BYTES: int = 10000  # Ignore images smaller than this (10KB)
+    SMART_ROUTER_DETECT_SCANNED_PDF: bool = True  # Auto-detect scanned/image-only PDFs
+    SMART_ROUTER_SCANNED_TEXT_THRESHOLD: int = 100  # Chars per page to consider "scanned" (<100)
+
+    # Routing Strategy
+    SMART_ROUTER_PREFER_VISION_FOR_CHARTS: bool = True  # Use Vision when images detected
+    SMART_ROUTER_ALWAYS_USE_DOCLING: bool = True  # Always extract text with Docling
+    SMART_ROUTER_ENABLE_PARALLEL_PARSING: bool = False  # Parse Docling + Vision concurrently (experimental)
+
+    # Cost Controls for Vision in Smart Router
+    SMART_ROUTER_MAX_IMAGES_FOR_VISION: int = 10  # Override Vision's default per-doc limit
+    SMART_ROUTER_SKIP_VISION_IF_EXPENSIVE: bool = True  # Skip Vision if >max images
+    SMART_ROUTER_SKIP_VISION_IF_NO_TEXT: bool = False  # Process image-only docs with Vision
+
+    # Result Merging Strategy
+    SMART_ROUTER_CONFIDENCE_WEIGHT_TEXT: float = 0.7  # Weight for Docling confidence
+    SMART_ROUTER_CONFIDENCE_WEIGHT_VISION: float = 0.3  # Weight for Vision confidence
+    SMART_ROUTER_INTERLEAVE_VISION_TEXT: bool = False  # Inject descriptions at positions vs append
+    SMART_ROUTER_VISION_TEXT_SEPARATOR: str = "\n\n---\n\n## Chart Interpretations\n\n"  # Separator for Vision text
+
+    # Fallback Behavior
+    SMART_ROUTER_FALLBACK_TO_DOCLING: bool = True  # Use Docling if Vision fails/disabled
+    SMART_ROUTER_FAIL_IF_ALL_PARSERS_FAIL: bool = True  # Return error if all parsers fail
+
+    # Performance & Logging
+    SMART_ROUTER_LOG_ROUTING_DECISIONS: bool = True  # Log which parser(s) selected
+    SMART_ROUTER_LOG_ANALYSIS_RESULTS: bool = True  # Log document analysis details
+    SMART_ROUTER_ENABLE_METRICS: bool = True  # Track routing statistics
+
     model_config = ConfigDict(
         env_file=".env",
         case_sensitive=True,

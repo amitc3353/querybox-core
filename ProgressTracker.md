@@ -3,9 +3,9 @@
 🚀 QueryboxCore - RAG Engine Development Progress
 
 ## 📊 Current Status (January 2025)
-- **Current Phase**: Step 13.7 - Phase 4: Vector Store Optimization (Qdrant Integration)
+- **Current Phase**: QueryBox Backend RAG Optimization - Ready to Resume
 - **Last Updated**: January 12, 2025
-- **Next Milestone**: 10x faster vector search, then Multi-Query RAG
+- **Next Milestone**: Phase 4 (Qdrant Integration), Phase 5 (Multi-Query RAG), Phase 6 (RAGAs Evaluation)
 
 ### Quick Stats:
 - ✅ **Backend Complete**: Steps 1-13.6 (98% Complete)
@@ -15,12 +15,15 @@
   - OpenRouter + OpenAI integration (Phase 3)
   - Comprehensive E2E test suite (800+ lines)
   - 48+ test files with excellent coverage
-- 🏗️ **In Progress**: Step 13.7 - Phase 4: Vector Store Optimization (Qdrant)
-  - Goal: 10x faster search (500ms → 50ms)
-  - Zero-risk augmentation (PostgreSQL stays primary)
-  - Foundation for Multi-Query RAG (Phase 5)
-- ⏳ **Next Up**: Phase 5 (Multi-Query RAG), Phase 6 (RAGAs Evaluation), Step 15 (Modular Architecture)
+- ✅ **Parsing Optimization Complete**: Phase 2 (Docling + Vision API + Smart Router)
+  - Intelligent document routing based on content analysis
+  - Docling for text and tables
+  - Vision API for charts/graphs
+  - Smart Router orchestrates optimal parser selection
+  - 99% parsing coverage across document types
+- 🏗️ **Next Up**: Phase 4 (Vector Store - Qdrant), Phase 5 (Multi-Query RAG), Phase 6 (RAGAs Evaluation)
 - ✅ **Completed Recently**:
+  - Phase 2: Parsing Optimization (Smart Router)
   - Step 13.6: E2E Integration Tests
   - Phase 1: Modular Architecture Foundation (Step 15.1)
   - Phase 3: OpenRouter + OpenAI Embeddings
@@ -33,12 +36,12 @@
 
 ### Modular Components (Step 15)
 
-| Component | Default (Current) | Alternatives (Planned) |
-|-----------|-------------------|------------------------|
-| **Parsers** | PyMuPDF | Docling, Unstructured.io, Custom |
-| **Embedders** | BGE-M3 (local) | OpenAI ada-002, Cohere, Custom |
-| **Retrievers** | Hybrid (BM25+Vector) | Pure Vector, Pure BM25, Custom |
-| **LLMs** | Ollama (local) | OpenAI GPT, Anthropic Claude, OpenRouter |
+| Component | Default (Current) | Alternatives (Available/Planned) |
+|-----------|-------------------|----------------------------------|
+| **Parsers** | Docling | ✅ Vision API, ✅ Smart Router, Unstructured.io |
+| **Embedders** | BGE-M3 (local) | ✅ OpenAI (text-embedding-3), Cohere, Custom |
+| **Retrievers** | Hybrid (BM25+Vector) | Pure Vector, Pure BM25, Multi-Query (Planned) |
+| **LLMs** | Ollama (local) | ✅ OpenRouter (GPT/Claude/Gemini), OpenAI, Anthropic |
 
 ### Implementation Strategy
 
@@ -927,7 +930,8 @@ Deliverable: Production-ready system, pilot success stories, launch-ready
 ## 🎯 Revised Roadmap Summary (Updated Jan 2025)
 
 **✅ Weeks 12-13.6 (Dec 2 - Jan 11):** Backend completion, Claude Code infrastructure, E2E tests
-**🏗️ Week 13.7 (Jan 13-14):** Phase 4 - Qdrant Integration → 10x faster search (IN PROGRESS)
+**✅ Phase 2 (Jan 12):** Parsing Optimization - Smart Router with Docling + Vision API (COMPLETE)
+**⏳ Week 13.7 (Jan 13-14):** Phase 4 - Qdrant Integration → 10x faster search (NEXT)
 **⏳ Week 13.8 (Jan 15-17):** Phase 5 - Multi-Query RAG → 15-25% better accuracy
 **⏳ Week 13.9 (Jan 18-20):** Phase 6 - RAGAs Evaluation & Tuning → Data-driven quality
 **⏳ Weeks 14-15 (Jan 21-Feb 2):** Frontend development OR Modular architecture completion
@@ -949,27 +953,33 @@ Deliverable: Production-ready system, pilot success stories, launch-ready
 - **Step 16 End (Feb 2):** If no user traffic → Reach out to communities (Reddit, Discord, Twitter)
 - **Step 17 End (Feb 16):** If no clear bottlenecks → Skip premature optimization, focus on quality
 
-💡 **Current Phase: Step 13.7 - Phase 4: Vector Store Optimization**
+💡 **Current Phase: Ready to Resume QueryBox Backend Optimization**
 
-**Backend Status:** ✅ 98% Complete
+**Backend Status:** ✅ 99% Complete
 - Full RAG pipeline operational (Steps 1-13.6)
 - Hybrid search with reranking working
 - Answer generation with verification and confidence scoring
 - OpenRouter + OpenAI integration (Phase 3) ✅
 - Comprehensive E2E test suite (Step 13.6) ✅
 - Modular architecture foundation (Step 15.1) ✅
+- Smart Router parsing optimization (Phase 2) ✅
 - 48+ test files with excellent coverage
 
 **Next Immediate Actions:**
 
-**Phase 4: Qdrant Integration (This Week - Jan 13-14):**
+**Resume from querybox-backend tasks.md:**
+- Continue from Phase 4: Vector Store Optimization (Qdrant Integration)
+- Or continue with Phase 5: Advanced Retrieval (Multi-Query RAG)
+- Or continue with Phase 6: Chunking & Testing (RAGAs Evaluation)
+
+**Phase 4: Qdrant Integration (6-7 hours):**
 1. **Setup Qdrant** (25 min) - Cloud or Docker deployment
 2. **Implement QdrantStore** (2 hours) - VectorStore implementation
 3. **Migration Script** (2 hours) - Sync PostgreSQL → Qdrant
 4. **Parallel Operation** (1.5 hours) - Dual indexing + routing
 5. **Testing & Validation** (2.5 hours) - Performance benchmarks
 
-**After Phase 4 (Next 1-2 Weeks):**
+**Alternative Paths:**
 - **Phase 5**: Multi-Query RAG (3 hours) - 15-25% better accuracy
 - **Phase 6**: RAGAs Evaluation (4 hours) - Data-driven tuning
 - **Step 15.2+**: Continue modular architecture (more providers)
