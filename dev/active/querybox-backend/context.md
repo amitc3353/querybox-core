@@ -1,43 +1,249 @@
 # QueryBox Backend RAG Optimization - Implementation Context
 
-## Current State Analysis
+**Last Updated**: Jan 11, 2025 - Evening
+**Current Phase**: Phase 1 COMPLETE ✅
+**Time Invested**: ~3.5 hours
+**Next Priority**: Phase 3 (OpenRouter + OpenAI) - Biggest accuracy win!
 
-### What's Working Well ✅
+---
 
-1. **Solid Foundation Architecture**
-   - PostgreSQL + pgvector for vector storage
-   - Hybrid search (BM25 + vector + RRF fusion)
-   - Advanced reranking with cross-encoder
-   - Chain-of-Verification for hallucination reduction
-   - Comprehensive metadata extraction
+## Quick Status
 
-2. **Excellent Parsing**
-   - Docling: 97.9% table accuracy
-   - OCR fallback with EasyOCR
-   - Rich metadata (10+ element types)
-   - Quality assessment scoring
+**✅ Completed:**
+- Phase 1.1-1.2: Abstract base classes + concrete implementations (4 interfaces, 4 providers)
+- Phase 1.3: Factory pattern for config-driven provider selection
+- Phase 1.4: Provider settings in config (partial - core providers done)
+- Phase 1.5: Integration of all existing services with factories
 
-3. **Sophisticated Chunking**
-   - Token-aware (BGE-M3 tokenizer)
-   - Semantic boundary preservation
-   - Rich metadata (section headings, chunk types)
-   - Overlap for context continuity
+**⚠️ In Progress:**
+- None (clean stopping point)
 
-4. **Production-Ready Features**
-   - Citation extraction with confidence scores
-   - Redis caching for embeddings
-   - Celery for async processing
-   - Structured logging
-   - Docker containerization
+**🎯 Next Up:**
+- Complete Phase 1.4: Add API keys and feature flags (30 min)
+- Phase 3: OpenRouter + OpenAI (2-3 hours) - **HIGHEST PRIORITY**
 
-### What Needs Improvement ⚠️
+**📊 Results So Far:**
+- 14 new files created (~2,800 lines)
+- 6 existing services modified
+- Zero-code component swapping now possible via .env
+- No regressions - all tests passing
 
-1. **LLM Quality**: tinyllama (637MB) insufficient for production
-2. **Speed**: CPU-only processing, slow embeddings (100-500ms/batch)
-3. **Scalability**: pgvector slower at scale, HNSW index requires 1000+ vectors
-4. **Visual Content**: No chart/graph interpretation (images extracted but not understood)
-5. **Modularity**: Components tightly coupled, hard to swap alternatives
-6. **Cost Optimization**: No clear path from prototype to production-scale
+---
+
+## Current Progress (Updated: Jan 11, 2025 - Evening)
+
+### ✅ Phase 1 COMPLETE - Modular Architecture Foundation
+
+**Total Time**: ~3.5 hours
+**Files Created**: 14 files, ~2,800 lines of code
+**Integration**: All existing services updated to use factories
+
+#### Phase 1.1 & 1.2: Abstract Base Classes + Implementations ✅
+
+Created modular architecture foundation with 4 abstract base classes and concrete implementations:
+
+1. **DocumentParser** (`backend/app/services/parsers/base.py` - 143 lines)
+   - Methods: `parse()`, `supports_format()`, `get_confidence()`
+   - Returns: `ParseResult` with text, metadata, confidence, images, tables
+   - Implementation: `DoclingParser` (`docling_parser.py` - 530 lines)
+   - Supports PDF, DOCX, PPTX, HTML, Markdown, TXT with smart fallbacks
+
+2. **EmbeddingProvider** (`backend/app/services/embeddings/base.py` - 134 lines)
+   - Methods: `embed()` (batch), `embed_query()` (single), `get_dimension()`
+   - Vector validation and normalization included
+   - Implementation: `BGEProvider` (`bge_provider.py` - 389 lines)
+   - 1024-dim BGE-M3, Redis caching, device auto-detection
+
+3. **VectorStore** (`backend/app/services/search/vector_stores/base.py` - 219 lines)
+   - Methods: `index()`, `search()`, `delete()`, `count()`, `get_by_id()`
+   - Returns: `SearchResult` with id, score, metadata, optional vector
+   - Implementation: `PgVectorStore` (`pgvector_store.py` - 379 lines)
+   - Cosine similarity search, metadata filtering, HNSW index
+
+4. **LLMProvider** (`backend/app/services/llm/base.py` - 218 lines)
+   - Methods: `generate()`, `generate_with_messages()`, `get_model_name()`
+   - Returns: `LLMResponse` with text, tokens, latency, metadata
+   - Implementation: `OllamaProvider` (`ollama_provider.py` - 344 lines)
+   - Async HTTP, retry logic, health monitoring, token tracking
+
+#### Phase 1.3: Factory Pattern ✅
+
+Created config-driven provider selection:
+
+1. **Parser Factory** (`backend/app/services/parsers/factory.py` - 103 lines)
+   - `get_parser()` reads `settings.PARSER_PRIMARY`
+   - Ready for: mineru, unstructured, smart router
+
+2. **Embedding Factory** (`backend/app/services/embeddings/factory.py` - 83 lines)
+   - `get_embedding_provider()` reads `settings.EMBEDDING_PROVIDER`
+   - Ready for: openai, cohere, voyage
+
+3. **Vector Store Factory** (`backend/app/services/search/vector_stores/factory.py` - 104 lines)
+   - `get_vector_store(db)` reads `settings.VECTOR_STORE`
+   - Ready for: qdrant, lancedb, weaviate
+
+4. **LLM Factory** (`backend/app/services/llm/factory.py` - 86 lines)
+   - `get_llm_provider()` reads `settings.LLM_PROVIDER`
+   - Ready for: openrouter, openai, claude
+
+#### Phase 1.4: Configuration Updates (Partial) ✅
+
+**Completed:**
+- ✅ Added provider settings to `backend/app/core/config.py`:
+  - `PARSER_PRIMARY = "docling"`
+  - `EMBEDDING_PROVIDER = "bge-m3"`
+  - `VECTOR_STORE = "pgvector"`
+  - `LLM_PROVIDER = "ollama"`
+- ✅ Updated `backend/.env.example` with comprehensive provider documentation
+
+**Still Needed:**
+- ⚠️ Add API keys: `OPENAI_API_KEY`, `OPENROUTER_API_KEY`, `QDRANT_API_KEY`
+- ⚠️ Add feature flags: `ENABLE_MULTI_QUERY`, `ENABLE_HYDE`, `ENABLE_QDRANT`
+
+#### Phase 1.5: Integration & Testing ✅
+
+Updated all existing services to use factories:
+
+1. **`backend/app/services/extraction/text_extraction_service.py`**
+   - Removed direct Docling imports
+   - Now uses `get_parser()` factory
+   - Parser configurable via `PARSER_PRIMARY` setting
+
+2. **`backend/app/services/embeddings/embedding_service.py`**
+   - Removed direct BGE-M3 model manager imports
+   - Now uses `get_embedding_provider()` factory
+   - Provider configurable via `EMBEDDING_PROVIDER` setting
+
+3. **`backend/app/services/answer_service.py`**
+   - Removed direct `get_ollama_client()` imports
+   - Now uses `get_llm_provider()` factory
+   - LLM configurable via `LLM_PROVIDER` setting
+
+4. **`backend/app/services/search/hybrid_search_service.py`**
+   - Already using dependency injection properly ✅
+   - No changes needed (ready for Qdrant when added)
+
+**Testing Results:**
+- ✅ All factories working correctly
+- ✅ All providers load and initialize successfully
+- ✅ No regressions in functionality
+- ✅ Config-driven component selection working
+
+### Current State
+
+**Phase 1 Architecture Complete** ✅
+1. ✅ 4 abstract base classes defining clear interfaces
+2. ✅ 4 concrete implementations wrapping existing code
+3. ✅ 4 factory functions for config-driven selection
+4. ✅ All existing services integrated with factories
+5. ✅ Zero-code component swapping via .env configuration
+6. ✅ Type-safe interfaces throughout
+7. ✅ Ready for immediate addition of new providers
+
+**Architecture Benefits Achieved:**
+- Change one line in .env, entire system switches providers
+- Add new providers by implementing interfaces (no service changes needed)
+- Per-request provider overrides possible
+- Clean separation of concerns
+- Easy testing with mocks
+
+**What's Next** 🎯
+1. **Phase 1.4 (Remaining)** - Add API keys and feature flags to config (30 min)
+2. **Phase 3 (PRIORITY)** - OpenRouter + OpenAI integration (2-3 hours)
+   - Expected: 60-70% answer quality improvement (biggest win!)
+3. **Phase 4** - Qdrant vector store (2 hours)
+   - Expected: 10x faster vector search
+4. **Phase 2** - Parsing optimizations (MinerU, vision API)
+5. **Phase 5** - Advanced retrieval (Multi-Query RAG)
+6. **Phase 6** - Testing, tuning, RAGAs evaluation
+
+### Files Created This Session
+
+**Abstract Base Classes (718 lines):**
+- `backend/app/services/parsers/base.py` (143 lines) - DocumentParser interface
+- `backend/app/services/parsers/__init__.py` (4 lines)
+- `backend/app/services/embeddings/base.py` (134 lines) - EmbeddingProvider interface
+- `backend/app/services/search/vector_stores/base.py` (219 lines) - VectorStore interface
+- `backend/app/services/search/vector_stores/__init__.py` (4 lines)
+- `backend/app/services/llm/base.py` (218 lines) - LLMProvider interface
+- `backend/app/services/llm/__init__.py` (4 lines)
+
+**Concrete Implementations (1,642 lines):**
+- `backend/app/services/parsers/docling_parser.py` (530 lines) - Docling wrapper
+- `backend/app/services/embeddings/bge_provider.py` (389 lines) - BGE-M3 wrapper
+- `backend/app/services/search/vector_stores/pgvector_store.py` (379 lines) - pgvector wrapper
+- `backend/app/services/llm/ollama_provider.py` (344 lines) - Ollama wrapper
+
+**Factory Functions (376 lines):**
+- `backend/app/services/parsers/factory.py` (103 lines) - Parser factory
+- `backend/app/services/embeddings/factory.py` (83 lines) - Embedding factory
+- `backend/app/services/search/vector_stores/factory.py` (104 lines) - Vector store factory
+- `backend/app/services/llm/factory.py` (86 lines) - LLM factory
+
+**Total:** 14 new files, ~2,800 lines of code
+
+### Files Modified This Session
+
+**Core Services (Integration):**
+- `backend/app/services/extraction/text_extraction_service.py` - Uses parser factory
+- `backend/app/services/embeddings/embedding_service.py` - Uses embedding factory
+- `backend/app/services/answer_service.py` - Uses LLM factory
+- `backend/app/services/search/hybrid_search_service.py` - No changes needed (already good)
+
+**Configuration:**
+- `backend/app/core/config.py` - Added provider settings
+- `backend/.env.example` - Added provider documentation
+
+**Testing:**
+- `backend/pytest.ini` - Updated for new test structure
+- `backend/tests/integration/test_verification_levels.py` - Minor updates
+- `backend/tests/integration/test_verification_pipeline.py` - Minor updates
+
+**Documentation:**
+- `dev/active/querybox-backend/context.md` - This file (progress tracking)
+- `dev/active/querybox-backend/tasks.md` - Task completion tracking
+- `dev/active/querybox-backend/SESSION_SUMMARY.md` - Session notes
+
+### Next Immediate Steps
+
+**Priority Order for Next Session:**
+
+1. **Complete Phase 1.4 Configuration** (30 min remaining)
+   - Add API key configs: `OPENAI_API_KEY`, `OPENROUTER_API_KEY`, `QDRANT_API_KEY`
+   - Add feature flags: `ENABLE_MULTI_QUERY`, `ENABLE_HYDE`, `ENABLE_QDRANT`
+   - Add OpenRouter/OpenAI model configs
+   - Update .env.example with new settings
+
+2. **Phase 3: OpenRouter + OpenAI Integration** (2-3 hours - HIGHEST PRIORITY)
+   - **Biggest expected win: 60-70% answer quality improvement**
+   - Create `OpenRouterProvider` implementing `LLMProvider` interface
+   - Create `OpenAIEmbeddingProvider` implementing `EmbeddingProvider` interface
+   - Add both to existing factories (already set up!)
+   - Test end-to-end with GPT-4o-mini vs tinyllama
+   - Add cost tracking and monitoring
+
+3. **Phase 4: Qdrant Vector Store** (2 hours)
+   - **Expected: 10x faster vector search (<50ms vs 500ms)**
+   - Create `QdrantStore` implementing `VectorStore` interface
+   - Add to vector store factory (already set up!)
+   - Migrate embeddings from PostgreSQL to Qdrant
+   - Parallel operation: Write to both, read from Qdrant
+   - Benchmark: Compare Qdrant vs pgvector performance
+
+4. **Phase 5: Multi-Query RAG** (2-3 hours)
+   - **Expected: 15-25% retrieval accuracy improvement**
+   - Create `MultiQueryRetriever` class
+   - Generate query variations using LLM
+   - Parallel search with multiple queries
+   - Deduplicate and re-rank results
+   - Cache query variations (Redis, 1hr TTL)
+
+5. **Phase 6: RAGAs Evaluation** (2-3 hours)
+   - Install RAGAs framework
+   - Create evaluation dataset (20 Q&A pairs)
+   - Run baseline evaluation
+   - Tune hyperparameters (RRF_K, weights, etc.)
+   - Validate final RAGAs scores >0.90
 
 ---
 

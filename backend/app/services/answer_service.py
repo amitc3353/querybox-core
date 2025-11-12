@@ -14,7 +14,8 @@ from typing import List, Optional, Dict, Any, Tuple
 from fastapi import HTTPException, status as http_status
 from redis import Redis
 
-from app.services.ollama_client import get_ollama_client, OllamaError
+from app.services.llm.factory import get_llm_provider
+from app.services.llm.base import LLMProvider
 from app.schemas.answer import (
     AnswerRequest,
     AnswerResponse,
@@ -97,18 +98,26 @@ class AnswerService:
     # Caching
     CACHE_TTL_SECONDS = 3600  # 1 hour
 
-    def __init__(self, redis_client: Optional[Redis] = None):
+    def __init__(self, redis_client: Optional[Redis] = None, llm_provider: Optional[LLMProvider] = None):
         """
         Initialize Answer Service
 
         Args:
             redis_client: Redis client for caching (optional)
+            llm_provider: Optional LLM provider. If None, uses factory to get default provider.
         """
-        self.ollama_client = get_ollama_client()
+        self.llm_provider = llm_provider
         self.redis_client = redis_client
         self.encoder = tiktoken.get_encoding("cl100k_base")
 
         logger.info("AnswerService initialized")
+
+    def _get_llm_provider(self) -> LLMProvider:
+        """Get or initialize LLM provider"""
+        if self.llm_provider is None:
+            self.llm_provider = get_llm_provider()
+            logger.info(f"Initialized LLM provider: {type(self.llm_provider).__name__}")
+        return self.llm_provider
 
     async def generate_answer(
         self,
@@ -166,19 +175,34 @@ class AnswerService:
             # Step 4: Build prompt
             prompt = self._build_prompt(request.query, selected_passages)
 
-            # Step 5: Generate answer via Ollama
+            # Step 5: Generate answer via LLM provider
             try:
-                generation_result = await self.ollama_client.generate(
-                    prompt=prompt,
-                    temperature=request.temperature,
-                    max_tokens=self.MAX_COMPLETION_TOKENS
-                )
+                llm_provider = self._get_llm_provider()
 
-                answer_text = generation_result["response"].strip()
-                metadata = generation_result["metadata"]
+                # Use async if available, otherwise sync
+                if hasattr(llm_provider, 'generate_async'):
+                    llm_response = await llm_provider.generate_async(
+                        prompt=prompt,
+                        temperature=request.temperature,
+                        max_tokens=self.MAX_COMPLETION_TOKENS
+                    )
+                else:
+                    llm_response = llm_provider.generate(
+                        prompt=prompt,
+                        temperature=request.temperature,
+                        max_tokens=self.MAX_COMPLETION_TOKENS
+                    )
 
-            except OllamaError as e:
-                logger.error(f"Ollama generation failed: {e}")
+                answer_text = llm_response.text.strip()
+                metadata = {
+                    "model": llm_response.model,
+                    "tokens_input": llm_response.tokens_input,
+                    "tokens_output": llm_response.tokens_output,
+                    "latency_ms": llm_response.latency_ms
+                }
+
+            except Exception as e:
+                logger.error(f"LLM generation failed: {e}")
                 raise HTTPException(
                     status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
                     detail=f"Answer generation service unavailable: {e}"

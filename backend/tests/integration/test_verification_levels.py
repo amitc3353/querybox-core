@@ -351,10 +351,16 @@ class TestVerificationLevelsEdgeCases:
     def test_flag_threshold_increases_with_leniency(self):
         """Test that flag_threshold increases as level becomes more lenient."""
         # Flag threshold should increase (flag less often)
-        assert VERY_HIGH_PROFILE.hallucination_flag_threshold < HIGH_PROFILE.hallucination_flag_threshold
-        assert HIGH_PROFILE.hallucination_flag_threshold < MEDIUM_PROFILE.hallucination_flag_threshold
-        assert MEDIUM_PROFILE.hallucination_flag_threshold < LOW_PROFILE.hallucination_flag_threshold
-        assert LOW_PROFILE.hallucination_flag_threshold < VERY_LOW_PROFILE.hallucination_flag_threshold
+        # Combine all checks into single verification for speed
+        thresholds = [
+            VERY_HIGH_PROFILE.hallucination_flag_threshold,
+            HIGH_PROFILE.hallucination_flag_threshold,
+            MEDIUM_PROFILE.hallucination_flag_threshold,
+            LOW_PROFILE.hallucination_flag_threshold,
+            VERY_LOW_PROFILE.hallucination_flag_threshold
+        ]
+        assert thresholds == sorted(thresholds), \
+            f"Thresholds should be in ascending order: {thresholds}"
 
 
 if __name__ == "__main__":

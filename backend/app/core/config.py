@@ -35,6 +35,22 @@ class Settings(BaseSettings):
     EMBEDDING_CACHE_ENABLED: bool = True  # Enable Redis caching for query embeddings
     EMBEDDING_CACHE_TTL_SECONDS: int = 1800  # 30 minutes TTL for cached embeddings
 
+    # ========================================
+    # Modular Provider Configuration (Enables swapping components via config)
+    # ========================================
+
+    # Parser Selection (Options: "docling", "mineru", "unstructured", "smart")
+    PARSER_PRIMARY: str = "docling"  # Primary parser for document extraction
+
+    # Embedding Provider Selection (Options: "bge", "bge-m3", "openai", "cohere", "voyage")
+    EMBEDDING_PROVIDER: str = "bge-m3"  # Embedding provider for vector generation
+
+    # Vector Store Selection (Options: "pgvector", "qdrant", "lancedb", "weaviate")
+    VECTOR_STORE: str = "pgvector"  # Vector database for similarity search
+
+    # LLM Provider Selection (Options: "ollama", "openrouter", "openai", "claude")
+    LLM_PROVIDER: str = "ollama"  # LLM provider for answer generation
+
     # pgvector Configuration
     PGVECTOR_INDEX_TYPE: str = "hnsw"
     PGVECTOR_HNSW_M: int = 16
