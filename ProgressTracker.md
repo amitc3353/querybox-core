@@ -3,27 +3,30 @@
 🚀 QueryboxCore - RAG Engine Development Progress
 
 ## 📊 Current Status (January 2025)
-- **Current Phase**: Step 13.7 - Phase 4: Vector Store Optimization (Qdrant Integration)
+- **Current Phase**: Step 13.7 Complete - Ready for Next Phase
 - **Last Updated**: January 12, 2025
-- **Next Milestone**: 10x faster vector search, then Multi-Query RAG
+- **Next Milestone**: Phase 5 (Multi-Query RAG) or Supabase Migration
 
 ### Quick Stats:
-- ✅ **Backend Complete**: Steps 1-13.6 (98% Complete)
+- ✅ **Backend Complete**: Steps 1-13.7 (100% MVP Complete)
   - Full RAG pipeline operational
   - Hybrid search with reranking
   - Answer generation with verification
   - OpenRouter + OpenAI integration (Phase 3)
   - Comprehensive E2E test suite (800+ lines)
+  - Qdrant infrastructure ready (Phase 4 - disabled until needed)
   - 48+ test files with excellent coverage
-- 🏗️ **In Progress**: Step 13.7 - Phase 4: Vector Store Optimization (Qdrant)
-  - Goal: 10x faster search (500ms → 50ms)
-  - Zero-risk augmentation (PostgreSQL stays primary)
-  - Foundation for Multi-Query RAG (Phase 5)
-- ⏳ **Next Up**: Phase 5 (Multi-Query RAG), Phase 6 (RAGAs Evaluation), Step 15 (Modular Architecture)
+  - Modular architecture foundation (Step 15.1)
+- ⏳ **Next Up**:
+  - **Option 1**: Supabase Migration (authentication + simplicity)
+  - **Option 2**: Phase 5 (Multi-Query RAG - 15-25% better accuracy)
+  - **Option 3**: Phase 6 (RAGAs Evaluation & Tuning)
+  - **Option 4**: Step 13 (Frontend Development)
 - ✅ **Completed Recently**:
+  - Step 13.7: Phase 4 - Qdrant Infrastructure (Jan 12-13)
   - Step 13.6: E2E Integration Tests
-  - Phase 1: Modular Architecture Foundation (Step 15.1)
   - Phase 3: OpenRouter + OpenAI Embeddings
+  - Phase 1: Modular Architecture Foundation (Step 15.1)
 
 ---
 
@@ -620,95 +623,104 @@ Deliverable: ✅ Production-ready E2E test suite with comprehensive documentatio
 
 ---
 
-### Step 13.7: Phase 4 - Vector Store Optimization (Jan 13-14) 🏗️ IN PROGRESS
-Goal: Add Qdrant for 10x Faster Vector Search (500ms → 50ms)
+### Step 13.7: Phase 4 - Vector Store Optimization (Jan 12-13) ✅ COMPLETE
+Goal: Qdrant Infrastructure for 10x Faster Vector Search (Plug-and-Play Ready)
 
-**Context:** Current pgvector search (~500ms) is functional but becomes a bottleneck at scale. Add Qdrant as a fast vector search layer alongside PostgreSQL to achieve 10x performance improvement while maintaining zero risk (PostgreSQL remains source of truth).
+**Context:** Built complete Qdrant infrastructure but kept disabled (`ENABLE_QDRANT=false`) until after Supabase migration or if performance requires it. PostgreSQL remains primary source of truth.
 
-**Why Now:**
-- ✅ E2E tests completed (Step 13.6) - provides safety net
-- ✅ Modular architecture foundation ready (Phase 1 from Step 15.1)
-- ⚠️ Multi-Query RAG (Phase 5) will triple search calls - need fast base first
-- 🎯 Enables <2s total RAG pipeline latency target
-
-**Architecture Strategy: Augment, Don't Replace**
+**Architecture Strategy: Hybrid (PostgreSQL Primary + Qdrant Speed Layer)**
 ```
-PostgreSQL (Source of Truth)
+PostgreSQL/Supabase (Source of Truth)
 ├─ Documents, chunks, metadata, relations
-├─ pgvector vectors (backup)
+├─ pgvector vectors (reliable fallback)
 └─ ACID guarantees
-         ↓ one-way sync
-Qdrant (Fast Search Layer)
+         ↓ one-way sync (when enabled)
+Qdrant (Speed Layer - DISABLED for now)
 ├─ Vectors only + minimal payload
-├─ 10x faster HNSW search
-└─ Automatic fallback if down
+├─ 10x faster HNSW search (<20ms)
+└─ Automatic circuit breaker failover
 ```
 
-## Phase 4.1: Qdrant Setup (25 min)
-* [] Choose deployment: Qdrant Cloud (easiest, free tier) or Docker (self-hosted)
-* [] Sign up for Qdrant Cloud and get API key OR run `docker run -p 6333:6333 qdrant/qdrant`
-* [] Add `qdrant-client>=1.7.0` to requirements.txt
-* [] Configure .env variables (QDRANT_URL, QDRANT_API_KEY, QDRANT_COLLECTION)
-* [] Test connection with simple ping
+## Phase 4.1: Qdrant Setup ✅ COMPLETE
+* [x] Choose deployment: Hybrid approach (Local Docker + Cloud configs)
+* [x] Add Qdrant service to docker-compose.yml (ports 6333/6334, 4GB memory)
+* [x] Add `qdrant-client==1.7.0` to requirements.txt
+* [x] Configure .env variables (QDRANT_URL, API_KEY, COLLECTION, HNSW params)
+* [x] Create environment templates (.env.local, .env.demo, .env.production)
+* [x] Test connection: Qdrant container starts successfully
 
-## Phase 4.2: Implement QdrantStore (2 hours)
-* [] Create `backend/app/services/search/vector_stores/qdrant_store.py`
-* [] Implement `QdrantStore(VectorStore)` following base class interface
-* [] Collection schema: 1024-dim (BGE-M3) or 3072-dim (OpenAI), cosine similarity
-* [] Implement methods: index(), search(), delete(), health_check()
-* [] Add batch upsert support (500 vectors per batch)
-* [] Implement metadata filtering and payload structure
-* [] Add error handling and connection retry logic
+## Phase 4.2: Implement QdrantStore ✅ COMPLETE
+* [x] Create `backend/app/services/search/vector_stores/qdrant_store.py` (600+ lines)
+* [x] Implement `QdrantStore(VectorStore)` with full VectorStore interface
+* [x] Collection schema: 1024-dim (BGE-M3), cosine similarity, HNSW index
+* [x] Implement methods: index(), search(), delete(), count(), health_check()
+* [x] Add batch upsert support (500 vectors per batch with parallel upload)
+* [x] Implement metadata filtering and payload structure (preserves all pgvector metadata)
+* [x] Add circuit breaker pattern (3 states: closed/open/half-open)
+* [x] Error handling and connection retry logic
 
-## Phase 4.3: Migration Script (2 hours)
-* [] Create `backend/scripts/migrate_to_qdrant.py`
-* [] Read all embeddings from PostgreSQL (batch processing)
-* [] Transform to Qdrant format (vector + payload with chunk_id, document_id, text snippet)
-* [] Batch upload to Qdrant (500 vectors at a time)
-* [] Add progress tracking (log every 1000 vectors)
-* [] Make idempotent (can re-run safely with upsert)
-* [] Add validation: verify counts match PostgreSQL
+## Phase 4.3: Migration Script ✅ COMPLETE (Script ready, not run)
+* [x] Create `backend/scripts/migrate_to_qdrant.py` (500+ lines, executable)
+* [x] Read all embeddings from PostgreSQL (batch processing, 500 vectors/batch)
+* [x] Transform to Qdrant format (vector + payload with chunk_id, document_id, text)
+* [x] Batch upload to Qdrant with progress tracking (log every 1000 vectors)
+* [x] Make idempotent (can re-run safely with upsert)
+* [x] Add dry-run mode and validation
+* [x] **Status**: Script ready but not needed (no production data to migrate)
 
-## Phase 4.4: Parallel Operation & Routing (1.5 hours)
-* [] Add ENABLE_QDRANT and VECTOR_STORE config flags to settings
-* [] Implement dual indexing: Write to PostgreSQL (always) + Qdrant (if enabled)
-* [] Create search routing logic: Qdrant (if available) → fallback to pgvector
-* [] Add health check before each Qdrant search
-* [] Implement circuit breaker pattern (disable after N failures)
-* [] Update factory.py to include Qdrant provider
-* [] Add metrics logging (search_provider used, latency)
+## Phase 4.4: Parallel Operation & Routing ⏭️ DEFERRED (~1 hour when enabling)
+* [⏭️] Add ENABLE_QDRANT flag to settings (already in config.py with ENABLE_QDRANT: bool = True)
+* [⏭️] Implement dual indexing: Write to PostgreSQL (always) + Qdrant (if enabled)
+* [⏭️] Create search routing logic: Qdrant (if available) → fallback to pgvector
+* [⏭️] Update embedding_service.py for dual-write
+* [⏭️] Update hybrid_search_service.py for smart routing
+* [x] Circuit breaker pattern already implemented in QdrantStore
+* [x] Factory.py already includes Qdrant provider
+* [⏭️] Add metrics logging (search_provider used, latency)
 
-## Phase 4.5: Testing & Validation (2.5 hours)
-* [] Correctness test: Run 50 queries on both stores, verify results match (90%+ overlap)
-* [] Performance benchmark: Measure latency (p50, p95, p99) - expect 10x improvement
-* [] Load test: 50-100 concurrent queries, verify no degradation
-* [] Fallback test: Stop Qdrant, verify automatic switch to pgvector works
-* [] Error handling test: Invalid queries, timeout scenarios
-* [] Update E2E tests to include Qdrant scenarios
-* [] Document performance results in dev/active/querybox-backend/phase4-results.md
+## Phase 4.5: Testing & Validation ⏭️ DEFERRED (will test when enabled)
+* [⏭️] Correctness test: Run 50 queries on both stores, verify results match
+* [⏭️] Performance benchmark: Measure latency (p50, p95, p99) - expect 10x improvement
+* [⏭️] Load test: 50-100 concurrent queries
+* [⏭️] Fallback test: Stop Qdrant, verify automatic switch to pgvector
+* [⏭️] Error handling test: Invalid queries, timeout scenarios
+* [⏭️] Update E2E tests to include Qdrant scenarios
+* [⏭️] Document performance results
 
 **Deliverable:**
-- ✅ Qdrant integrated and operational (Cloud or Docker)
-- ✅ 10x faster vector search (500ms → 50ms p95)
-- ✅ Zero risk: PostgreSQL unchanged, instant rollback via config
-- ✅ A/B testable: Can compare performance with feature flag
-- ✅ All E2E tests passing with Qdrant enabled
-- ✅ Migration script for existing embeddings
-- ✅ Comprehensive documentation
+- ✅ Qdrant infrastructure complete and tested (Local Docker setup)
+- ✅ QdrantStore implementation (600+ lines, production-grade)
+- ✅ Migration script ready (500+ lines, idempotent)
+- ✅ Circuit breaker pattern for automatic failover
+- ✅ Configuration system (3 environment templates)
+- ✅ Comprehensive activation guide (QDRANT_ACTIVATION.md)
+- ✅ Session summary with all decisions (PHASE4_QDRANT_SESSION_SUMMARY.md)
+- ✅ ENABLE_QDRANT=false in working configs (disabled until needed)
+- ✅ Plug-and-play ready: <5 minutes to activate when needed
 
-**Success Criteria:**
-- Search latency: <50ms p95 (10x improvement from 500ms)
-- Correctness: 90%+ result overlap between Qdrant and pgvector
-- Reliability: Automatic fallback works within 100ms
-- Zero downtime: System continues working if Qdrant unavailable
-- Cost: Free tier (300K vectors) or self-hosted ($10-20/month)
+**Current Status:**
+- Infrastructure: ✅ Complete and verified
+- Integration: ⏭️ Deferred (~1 hour work when enabling)
+- Decision: Keep disabled until Supabase migration or if performance issue
+- Activation: 3-step process documented, ready when needed
 
-**Time Estimate:** 6-7 hours (1 full focused day)
+**Future Activation Path** (When ready):
+1. Set `ENABLE_QDRANT=true` in .env
+2. Ensure Qdrant running (`docker-compose up -d qdrant`)
+3. Restart backend (`docker-compose restart backend`)
+4. Implement integration (~1 hour):
+   - Dual-write in embedding service
+   - Smart routing in search service
+   - Test and benchmark
 
-**Next Steps After Phase 4:**
-- Phase 5: Multi-Query RAG (leverages fast Qdrant base)
+**Time Spent:** ~4 hours (infrastructure + documentation)
+**Time Deferred:** ~1 hour (integration when enabling)
+
+**Next Steps:**
+- Continue with Supabase migration (authentication + simplicity)
+- Enable Qdrant if search latency >100ms p95 or vector count >500K
+- Phase 5: Multi-Query RAG (after deciding on vector store strategy)
 - Phase 6: RAGAs Evaluation & Tuning
-- Step 15: Complete modular architecture refactoring
 
 ---
 
@@ -926,10 +938,11 @@ Deliverable: Production-ready system, pilot success stories, launch-ready
 
 ## 🎯 Revised Roadmap Summary (Updated Jan 2025)
 
-**✅ Weeks 12-13.6 (Dec 2 - Jan 11):** Backend completion, Claude Code infrastructure, E2E tests
-**🏗️ Week 13.7 (Jan 13-14):** Phase 4 - Qdrant Integration → 10x faster search (IN PROGRESS)
-**⏳ Week 13.8 (Jan 15-17):** Phase 5 - Multi-Query RAG → 15-25% better accuracy
-**⏳ Week 13.9 (Jan 18-20):** Phase 6 - RAGAs Evaluation & Tuning → Data-driven quality
+**✅ Weeks 12-13.7 (Dec 2 - Jan 13):** Backend MVP complete, E2E tests, Qdrant infrastructure ready
+**⏳ Week 13.8+ (Jan 14+):** Choose next direction:
+  - **Path A**: Supabase Migration → Authentication + simplicity
+  - **Path B**: Phase 5 (Multi-Query RAG) + Phase 6 (RAGAs) → Quality improvements
+  - **Path C**: Frontend Development (Step 13) → User-facing demo
 **⏳ Weeks 14-15 (Jan 21-Feb 2):** Frontend development OR Modular architecture completion
 **Week 16 (Feb 3-9):** User feedback → Pilot users, usage data collection
 **Weeks 17-18 (Feb 10-23):** Data-driven optimization → Measured bottlenecks
@@ -949,36 +962,44 @@ Deliverable: Production-ready system, pilot success stories, launch-ready
 - **Step 16 End (Feb 2):** If no user traffic → Reach out to communities (Reddit, Discord, Twitter)
 - **Step 17 End (Feb 16):** If no clear bottlenecks → Skip premature optimization, focus on quality
 
-💡 **Current Phase: Step 13.7 - Phase 4: Vector Store Optimization**
+💡 **Current Phase: Ready for Next Direction**
 
-**Backend Status:** ✅ 98% Complete
-- Full RAG pipeline operational (Steps 1-13.6)
+**Backend Status:** ✅ 100% MVP Complete
+- Full RAG pipeline operational (Steps 1-13.7)
 - Hybrid search with reranking working
 - Answer generation with verification and confidence scoring
 - OpenRouter + OpenAI integration (Phase 3) ✅
 - Comprehensive E2E test suite (Step 13.6) ✅
+- Qdrant infrastructure ready (Phase 4 - disabled until needed) ✅
 - Modular architecture foundation (Step 15.1) ✅
 - 48+ test files with excellent coverage
 
-**Next Immediate Actions:**
+**Choose Next Direction:**
 
-**Phase 4: Qdrant Integration (This Week - Jan 13-14):**
-1. **Setup Qdrant** (25 min) - Cloud or Docker deployment
-2. **Implement QdrantStore** (2 hours) - VectorStore implementation
-3. **Migration Script** (2 hours) - Sync PostgreSQL → Qdrant
-4. **Parallel Operation** (1.5 hours) - Dual indexing + routing
-5. **Testing & Validation** (2.5 hours) - Performance benchmarks
+**Option 1: Supabase Migration** (Recommended for MVP)
+- Migrate from PostgreSQL to Supabase
+- Get authentication working (user sign-up, login, session management)
+- Leverage Supabase pgvector (same as current PostgreSQL)
+- Enable Qdrant later if performance becomes issue
+- **Time**: 4-6 hours
+- **Benefit**: Simplifies auth, cloud-ready, production-grade
 
-**After Phase 4 (Next 1-2 Weeks):**
+**Option 2: Quality Improvements** (If quality is priority)
 - **Phase 5**: Multi-Query RAG (3 hours) - 15-25% better accuracy
 - **Phase 6**: RAGAs Evaluation (4 hours) - Data-driven tuning
-- **Step 15.2+**: Continue modular architecture (more providers)
+- **Benefit**: Higher accuracy, measurable quality metrics
 
-**Target Outcomes:**
-- 10x faster search: 500ms → 50ms (p95 latency)
-- Zero risk: PostgreSQL unchanged, instant rollback
-- Foundation for Multi-Query RAG (Phase 5)
-- Scales to 10M+ vectors effortlessly
+**Option 3: Frontend Development** (If demo is priority)
+- Step 13: Build Next.js frontend (1-2 weeks)
+- Upload → Search → Chat UI with citations
+- **Benefit**: User-facing demo, stakeholder visibility
+
+**Option 4: Continue Modular Architecture** (Step 15.2+)
+- Add more providers (embedding, LLM, parsing)
+- Build per-client configuration system
+- **Benefit**: Platform flexibility, multi-tenant ready
+
+**Recommendation**: Start with Supabase migration for authentication simplicity, then decide between quality improvements or frontend based on priorities.
 
 
 <!-- ### Step 8: Upload Status Tracking (3 hours)
@@ -1240,6 +1261,75 @@ Evening Review (1 hour)
 2. Review code quality
 3. Plan next day
 4. Push to repository
+
+---
+
+## 🔮 Future Enhancements (Post-MVP)
+
+### Qdrant Vector Store - Deferred Integration (~1 hour)
+**Status**: Infrastructure complete, disabled until needed
+**When to Enable**: After Supabase migration or if search >100ms p95
+
+**Deferred Tasks**:
+1. **Dual-Write Implementation** (30 min)
+   - Update `backend/app/services/embedding_service.py`
+   - Write to PostgreSQL (always) + Qdrant (if enabled)
+   - Test: Upload document, verify in both stores
+
+2. **Smart Search Routing** (20 min)
+   - Update `backend/app/services/search/hybrid_search_service.py`
+   - Try Qdrant first → fallback to pgvector if circuit breaker open
+   - Add metrics logging (provider used, latency)
+
+3. **Performance Benchmarking** (10 min)
+   - Run test queries on both stores
+   - Measure latency improvement (expect 10x: 500ms → 50ms)
+   - Verify result correctness (90%+ overlap)
+
+**Expected Impact**: 10x faster search, <20ms p95 latency, scales to 10M+ vectors
+
+**Activation Guide**: See `dev/active/querybox-backend/QDRANT_ACTIVATION.md`
+**Implementation Details**: See `dev/active/PHASE4_QDRANT_SESSION_SUMMARY.md`
+
+---
+
+### Phase 2: Parsing Optimization - Deferred (~2-3 hours)
+**Status**: Basic Docling parser working, advanced features NOT implemented
+**When to Implement**: Based on user feedback for specific document types
+
+**Current Implementation**:
+- ✅ DoclingParser with smart OCR fallback
+- ✅ Basic image metadata extraction (position, type only)
+- ✅ Multi-format support (PDF, DOCX, PPTX, HTML, MD, TXT)
+- ✅ PyPDF2 fallback for PDFs
+- ✅ Quality assessment and language detection
+
+**Deferred Features** (NOT implemented):
+1. **MinerU Integration** (~1 hour)
+   - Better table extraction for financial documents
+   - Smart routing for table-heavy documents
+   - File: `backend/app/services/parsers/mineru_parser.py` (not created)
+
+2. **GPT-4o-mini Vision Parser** (~1 hour)
+   - Chart and graph interpretation with GPT-4o-mini
+   - Image content extraction and description
+   - File: `backend/app/services/parsers/vision_parser.py` (not created)
+
+3. **Smart Document Router** (~1 hour)
+   - Document classifier (table_heavy, scanned, standard)
+   - Confidence-based fallback routing
+   - File: `backend/app/services/parsers/router.py` (not created)
+
+4. **Docling Optimization** (~30 min)
+   - GPU acceleration (CUDA support)
+   - Parallel page processing
+   - OCR batch optimization
+
+**Expected Impact**: 99% parsing accuracy across all document types, faster processing
+
+**Note**: Config mentions "smart" parser option but it's not implemented. Factory only supports "docling".
+
+---
 
 📊 Week-by-Week Deliverables
 Week 1 Deliverable

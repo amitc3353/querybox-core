@@ -64,14 +64,22 @@ def get_vector_store(
         dimension = kwargs.pop("dimension", 1024)  # Default for BGE-M3
         return PgVectorStore(db=db, dimension=dimension)
 
+    elif name == "qdrant":
+        from app.services.search.vector_stores.qdrant_store import QdrantStore
+        url = kwargs.pop("url", settings.QDRANT_URL)
+        api_key = kwargs.pop("api_key", settings.QDRANT_API_KEY)
+        collection_name = kwargs.pop("collection_name", settings.QDRANT_COLLECTION)
+        dimension = kwargs.pop("dimension", 1024)
+        prefer_grpc = kwargs.pop("prefer_grpc", settings.QDRANT_PREFER_GRPC)
+        return QdrantStore(
+            url=url,
+            api_key=api_key,
+            collection_name=collection_name,
+            dimension=dimension,
+            prefer_grpc=prefer_grpc
+        )
+
     # Future stores (uncomment when implemented):
-    # elif name == "qdrant":
-    #     from app.services.search.vector_stores.qdrant_store import QdrantStore
-    #     url = kwargs.pop("url", settings.QDRANT_URL)
-    #     api_key = kwargs.pop("api_key", settings.QDRANT_API_KEY)
-    #     dimension = kwargs.pop("dimension", 1024)
-    #     return QdrantStore(url=url, api_key=api_key, dimension=dimension)
-    #
     # elif name == "lancedb":
     #     from app.services.search.vector_stores.lancedb_store import LanceDBStore
     #     uri = kwargs.pop("uri", settings.LANCEDB_URI)
@@ -86,7 +94,7 @@ def get_vector_store(
     #     return WeaviateStore(url=url, api_key=api_key, dimension=dimension)
 
     else:
-        available = ["pgvector"]  # Add others as implemented
+        available = ["pgvector", "qdrant"]  # Add others as implemented
         raise ValueError(
             f"Unknown vector store: '{name}'. "
             f"Available options: {', '.join(available)}"
@@ -100,4 +108,4 @@ def get_available_vector_stores() -> list[str]:
     Returns:
         List of store names that can be used with get_vector_store()
     """
-    return ["pgvector"]  # Add others as implemented
+    return ["pgvector", "qdrant"]  # Add others as implemented

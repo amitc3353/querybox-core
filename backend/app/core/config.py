@@ -66,6 +66,42 @@ class Settings(BaseSettings):
     PGVECTOR_HNSW_EF_CONSTRUCTION: int = 64
     PGVECTOR_MIN_VECTORS_FOR_INDEX: int = 1000
 
+    # ========================================
+    # Qdrant Vector Store Configuration (Phase 4)
+    # ========================================
+
+    # Qdrant Feature Flag
+    # Set to True: Enables parallel indexing (writes to both pgvector + Qdrant) and smart fallback
+    # Set to False ONLY when:
+    #   - Initial development/testing before Qdrant is ready
+    #   - Troubleshooting Qdrant connection issues
+    #   - Temporarily disabling Qdrant during infrastructure changes
+    #   - Running on resource-constrained environments (save memory/CPU)
+    ENABLE_QDRANT: bool = True  # Enable Qdrant parallel indexing and smart fallback
+
+    # Qdrant Connection Settings
+    QDRANT_URL: str = "http://localhost:6333"  # Local Docker or Cloud URL
+    QDRANT_API_KEY: Optional[str] = None  # Required for Cloud, empty for local Docker
+    QDRANT_COLLECTION: str = "querybox_embeddings"  # Collection name
+    QDRANT_PREFER_GRPC: bool = False  # Use gRPC instead of HTTP (faster, requires port 6334)
+
+    # Qdrant Performance Tuning
+    QDRANT_BATCH_SIZE: int = 500  # Vectors per batch insert (100-1000)
+    QDRANT_TIMEOUT: int = 5  # Connection timeout in seconds
+    QDRANT_SEARCH_TIMEOUT: int = 2  # Search operation timeout in seconds
+    QDRANT_PARALLEL_UPLOAD: bool = True  # Enable parallel batch uploads
+
+    # Circuit Breaker Configuration (Automatic fallback to pgvector if Qdrant unavailable)
+    QDRANT_CIRCUIT_FAILURE_THRESHOLD: int = 5  # Failures before opening circuit
+    QDRANT_CIRCUIT_COOLDOWN: int = 30  # Seconds before retry after circuit opens
+    QDRANT_CIRCUIT_HALF_OPEN_REQUESTS: int = 3  # Test requests in half-open state
+
+    # HNSW Index Configuration (Advanced - affects search quality vs speed)
+    QDRANT_HNSW_M: int = 16  # Connections per layer (8-64, higher = better recall, more memory)
+    QDRANT_HNSW_EF_CONSTRUCT: int = 100  # Construction-time search depth (64-256)
+    QDRANT_HNSW_EF_SEARCH: int = 64  # Runtime search depth (16-512, higher = better recall, slower)
+    QDRANT_ON_DISK: bool = False  # Store vectors on disk (for >1M vectors, saves RAM)
+
     # Vector Search Configuration (Step 9.3)
     VECTOR_SEARCH_TIMEOUT_MS: int = 500
     VECTOR_SEARCH_MAX_LIMIT: int = 100

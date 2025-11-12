@@ -47,6 +47,7 @@ rapidfuzz==3.6.1
 
 # Vector database
 pgvector==0.2.4
+qdrant-client==1.7.0  # Phase 4: Qdrant vector store for 10x faster search
 
 # HTTP client
 httpx==0.25.2
