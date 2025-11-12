@@ -51,6 +51,14 @@ def get_parser(parser_name: Optional[str] = None) -> DocumentParser:
     if name == "docling":
         return DoclingParser()
 
+    elif name == "vision":
+        from app.services.parsers.vision_parser import VisionParser
+        return VisionParser()
+
+    elif name == "smart":
+        from app.services.parsers.smart_router import SmartRouter
+        return SmartRouter()
+
     # Future parsers (uncomment when implemented):
     # elif name == "mineru":
     #     from app.services.parsers.mineru_parser import MinerUParser
@@ -59,13 +67,9 @@ def get_parser(parser_name: Optional[str] = None) -> DocumentParser:
     # elif name == "unstructured":
     #     from app.services.parsers.unstructured_parser import UnstructuredParser
     #     return UnstructuredParser()
-    #
-    # elif name == "smart":
-    #     from app.services.parsers.router import SmartParsingService
-    #     return SmartParsingService()
 
     else:
-        available = ["docling"]  # Add others as implemented
+        available = ["docling", "vision", "smart"]  # Add others as implemented
         raise ValueError(
             f"Unknown parser: '{name}'. Available options: {', '.join(available)}"
         )
@@ -78,4 +82,4 @@ def get_available_parsers() -> list[str]:
     Returns:
         List of parser names that can be used with get_parser()
     """
-    return ["docling"]  # Add others as implemented
+    return ["docling", "vision", "smart"]  # Add others as implemented

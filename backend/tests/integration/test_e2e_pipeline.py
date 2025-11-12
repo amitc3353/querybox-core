@@ -688,6 +688,13 @@ class TestCompleteE2EPipeline:
         print("\n[E2E] ✓ Processing pipeline completed successfully")
         print(f"[E2E] Summary: {get_processing_summary(db_session, document_id)}")
 
+        # Update document status to COMPLETED now that all stages are done
+        document = db_session.query(Document).filter(Document.id == document_id).first()
+        document.status = DocumentStatusEnum.COMPLETED
+        db_session.commit()
+        db_session.refresh(document)
+        print(f"[E2E] Document status updated to: {document.status}")
+
         # =====================================================================
         # STEP 5: TEST KEYWORD SEARCH
         # =====================================================================
