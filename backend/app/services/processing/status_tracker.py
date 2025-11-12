@@ -102,7 +102,12 @@ class ProcessingStatusTracker:
                 if status in [StageStatusEnum.COMPLETED, StageStatusEnum.FAILED]:
                     existing_status.completed_at = current_time
                     if existing_status.started_at:
-                        duration = (current_time - existing_status.started_at).total_seconds() * 1000
+                        # Handle both timezone-aware and naive datetimes (SQLite compatibility)
+                        started_at = existing_status.started_at
+                        if started_at.tzinfo is None:
+                            # Make naive datetime timezone-aware (assume UTC)
+                            started_at = started_at.replace(tzinfo=timezone.utc)
+                        duration = (current_time - started_at).total_seconds() * 1000
                         existing_status.duration_ms = int(duration)
 
                 # Handle error information
