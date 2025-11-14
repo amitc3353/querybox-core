@@ -12,7 +12,35 @@ class Settings(BaseSettings):
     
     # Redis
     REDIS_URL: str = "redis://localhost:6379"
-    
+
+    # Redis connection properties (parsed from REDIS_URL)
+    @property
+    def REDIS_HOST(self) -> str:
+        """Extract Redis host from REDIS_URL"""
+        from urllib.parse import urlparse
+        parsed = urlparse(self.REDIS_URL)
+        return parsed.hostname or "localhost"
+
+    @property
+    def REDIS_PORT(self) -> int:
+        """Extract Redis port from REDIS_URL"""
+        from urllib.parse import urlparse
+        parsed = urlparse(self.REDIS_URL)
+        return parsed.port or 6379
+
+    @property
+    def REDIS_DB(self) -> int:
+        """Extract Redis database from REDIS_URL path"""
+        from urllib.parse import urlparse
+        parsed = urlparse(self.REDIS_URL)
+        # Path is like /0, /1, etc.
+        if parsed.path and len(parsed.path) > 1:
+            try:
+                return int(parsed.path.lstrip('/'))
+            except ValueError:
+                return 0
+        return 0
+
     # Storage
     S3_ENDPOINT: str = "http://localhost:9000"
     S3_ACCESS_KEY: str = "minioadmin"
@@ -438,6 +466,37 @@ class Settings(BaseSettings):
     SMART_ROUTER_LOG_ROUTING_DECISIONS: bool = True  # Log which parser(s) selected
     SMART_ROUTER_LOG_ANALYSIS_RESULTS: bool = True  # Log document analysis details
     SMART_ROUTER_ENABLE_METRICS: bool = True  # Track routing statistics
+
+    # ========================================
+    # Multi-Query RAG Configuration (Phase 5)
+    # ========================================
+
+    # Retrieval Mode Selection
+    RETRIEVAL_MODE: str = "standard"  # Options: "standard" | "multi_query" | "hyde"
+
+    # Multi-Query Feature Control
+    MULTI_QUERY_ENABLED: bool = True  # Master switch for Multi-Query RAG
+    MULTI_QUERY_NUM_VARIATIONS: int = 2  # Number of query variations to generate (1-5)
+
+    # LLM Configuration for Query Generation
+    MULTI_QUERY_LLM_PROVIDER: str = "openrouter"  # "openrouter" | "ollama"
+    MULTI_QUERY_MODEL: str = "openai/gpt-4o-mini"  # Model for query expansion
+    MULTI_QUERY_TEMPERATURE: float = 0.7  # LLM temperature for variation generation
+    MULTI_QUERY_MAX_TOKENS: int = 200  # Max tokens for LLM response
+
+    # Caching Configuration
+    MULTI_QUERY_CACHE_ENABLED: bool = True  # Enable Redis caching for variations
+    MULTI_QUERY_CACHE_TTL: int = 3600  # Cache TTL in seconds (1 hour)
+
+    # Fusion Algorithm Parameters
+    MULTI_QUERY_FREQ_WEIGHT: float = 2.0  # Weight for frequency score in fusion
+    MULTI_QUERY_RRF_WEIGHT: float = 1.0  # Weight for RRF score in fusion
+
+    # Error Handling
+    MULTI_QUERY_FALLBACK_ON_ERROR: bool = True  # Auto-fallback to standard search on errors
+
+    # Cost Tracking
+    MULTI_QUERY_TRACK_COST: bool = True  # Track and log LLM costs
 
     model_config = ConfigDict(
         env_file=".env",

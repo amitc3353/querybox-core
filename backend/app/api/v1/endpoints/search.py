@@ -17,14 +17,18 @@ from app.schemas.search import (
     UnifiedSearchQuery,
     SearchResponseWithCitations
 )
+from app.schemas.multi_query import MultiQueryResponse
 from app.services.search import (
     get_search_service,
     get_vector_search_service,
     get_unified_search_service,
+    get_hybrid_search_service,
+    get_multi_query_retriever,
     KeywordSearchService
 )
 from app.services.embeddings import get_embedding_service
 from app.db.database import get_db
+from app.core.config import settings
 
 # Initialize router
 router = APIRouter()
@@ -519,33 +523,74 @@ async def hybrid_search(
             vector_weight=query.vector_weight,
             enable_reranking=query.enable_reranking,
             citations_enabled=citations,
-            citation_limit=citation_limit
+            citation_limit=citation_limit,
+            retrieval_mode=settings.RETRIEVAL_MODE
         )
 
         # Get services
         embedding_service = get_embedding_service()
-        unified_search_service = get_unified_search_service(db, embedding_service)
 
-        # Execute hybrid search
-        response = unified_search_service.search(
-            query=query.query,
-            strategy="hybrid",
-            filters=query.filters,
-            limit=query.limit,
-            offset=query.offset,
-            # Vector search parameters
-            similarity_threshold=query.similarity_threshold,
-            # Hybrid search parameters
-            keyword_weight=query.keyword_weight,
-            vector_weight=query.vector_weight,
-            keyword_top_k=query.keyword_top_k,
-            vector_top_k=query.vector_top_k,
-            # Advanced reranking parameters
-            enable_reranking=query.enable_reranking,
-            rerank_top_k=query.rerank_top_k,
-            enable_mmr=query.enable_mmr,
-            enable_dedup=query.enable_dedup
-        )
+        # Route based on RETRIEVAL_MODE configuration (Phase 5: Multi-Query RAG)
+        if settings.RETRIEVAL_MODE == "multi_query" and settings.MULTI_QUERY_ENABLED:
+            # Use Multi-Query RAG retriever
+            logger.info("hybrid_search_using_multi_query", query=query.query[:100])
+
+            # Get hybrid search service (required for Multi-Query RAG)
+            hybrid_search_service = get_hybrid_search_service(db, embedding_service)
+
+            # Initialize Redis client for caching (optional)
+            redis_client = None
+            if settings.MULTI_QUERY_CACHE_ENABLED:
+                try:
+                    from redis import Redis
+                    redis_client = Redis(
+                        host=settings.REDIS_HOST,
+                        port=settings.REDIS_PORT,
+                        db=settings.REDIS_DB,
+                        decode_responses=True,
+                    )
+                except Exception as e:
+                    logger.warning("multi_query_redis_init_failed", error=str(e))
+
+            # Create multi-query retriever
+            multi_query_retriever = get_multi_query_retriever(
+                hybrid_search_service=hybrid_search_service,
+                redis_client=redis_client,
+            )
+
+            # Execute multi-query retrieval
+            response = await multi_query_retriever.retrieve(
+                query=query.query,
+                client_id=1,  # TODO: Get from auth context
+                top_k=query.limit,
+                filters=query.filters,
+                enable_reranking=query.enable_reranking,
+            )
+        else:
+            # Use standard unified search service
+            logger.info("hybrid_search_using_standard", query=query.query[:100])
+            unified_search_service = get_unified_search_service(db, embedding_service)
+
+            # Execute hybrid search
+            response = unified_search_service.search(
+                query=query.query,
+                strategy="hybrid",
+                filters=query.filters,
+                limit=query.limit,
+                offset=query.offset,
+                # Vector search parameters
+                similarity_threshold=query.similarity_threshold,
+                # Hybrid search parameters
+                keyword_weight=query.keyword_weight,
+                vector_weight=query.vector_weight,
+                keyword_top_k=query.keyword_top_k,
+                vector_top_k=query.vector_top_k,
+                # Advanced reranking parameters
+                enable_reranking=query.enable_reranking,
+                rerank_top_k=query.rerank_top_k,
+                enable_mmr=query.enable_mmr,
+                enable_dedup=query.enable_dedup
+            )
 
         # Extract citations if enabled
         if citations:

@@ -50,6 +50,10 @@ from app.services.search.reranking_pipeline import (
     RerankingPipeline,
     get_reranking_pipeline
 )
+from app.services.search.multi_query_retriever import (
+    MultiQueryRetriever,
+    get_multi_query_retriever
+)
 
 __all__ = [
     # Keyword Search
@@ -87,4 +91,7 @@ __all__ = [
     # Reranking Pipeline (Step 10.2)
     "RerankingPipeline",
     "get_reranking_pipeline",
+    # Multi-Query RAG (Phase 5)
+    "MultiQueryRetriever",
+    "get_multi_query_retriever",
 ]
