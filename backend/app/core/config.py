@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     S3_BUCKET_NAME: str = "querybox-documents"
     
     # AI/Embeddings
-    OPENAI_API_KEY: Optional[str] = "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"
+    OPENAI_API_KEY: Optional[str] = None
 
     # ========================================
     # OpenAI Embedding Configuration (Phase 3)
@@ -273,7 +273,7 @@ class Settings(BaseSettings):
     # ========================================
     # OpenRouter provides access to multiple LLMs (GPT, Claude, Gemini, Llama)
     # Sign up at: https://openrouter.ai/
-    OPENROUTER_API_KEY: Optional[str] = "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"  # Required for OpenRouter (sk-or-v1-...)
+    OPENROUTER_API_KEY: Optional[str] = None  # Required for OpenRouter (sk-or-v1-...)
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
     OPENROUTER_MODEL: str = "openai/gpt-4o-mini"  # Default model (fast + affordable)
     OPENROUTER_APP_NAME: str = "QueryBox Core"  # App name (for OpenRouter rankings)
