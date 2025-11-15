@@ -13,6 +13,7 @@ import logging
 import asyncio
 from uuid import UUID
 import psutil
+import sentry_sdk
 
 from app.celery_app import celery_app
 from app.db.database import SessionLocal
@@ -115,6 +116,20 @@ def extract_document_text(self, document_id: str):
                 f"{result.error_message}"
             )
 
+            # Capture in Sentry with context
+            sentry_sdk.capture_message(
+                f"Text extraction failed: {result.error_message}",
+                level="error",
+                extras={
+                    "document_id": document_id,
+                    "document_name": document.original_name,
+                    "mime_type": document.mime_type,
+                    "file_size": document.file_size,
+                    "error_message": result.error_message,
+                    "retry_count": self.request.retries,
+                }
+            )
+
             # Mark extraction stage as FAILED
             run_async(tracker.mark_stage_failed(
                 document_id=doc_uuid,
@@ -210,6 +225,17 @@ def extract_document_text(self, document_id: str):
             exc_info=True,
         )
 
+        # Capture exception in Sentry with full context
+        sentry_sdk.capture_exception(
+            e,
+            extras={
+                "document_id": document_id,
+                "task_name": "extract_document_text",
+                "retry_count": self.request.retries,
+                "max_retries": self.max_retries,
+            }
+        )
+
         # Update status to FAILED
         try:
             tracker = ProcessingStatusTracker(db)
@@ -227,6 +253,7 @@ def extract_document_text(self, document_id: str):
 
         except Exception as status_error:
             logger.error(f"Failed to update status after error: {status_error}")
+            sentry_sdk.capture_exception(status_error)
 
         # Retry if possible
         if self.request.retries < self.max_retries:

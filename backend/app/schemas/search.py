@@ -108,6 +108,8 @@ class SearchResultItem(BaseModel):
     document_type: Optional[str] = Field(None, description="Document MIME type")
     created_at: Optional[datetime] = Field(None, description="Document creation timestamp")
     embedding: Optional[List[float]] = Field(None, description="Embedding vector for MMR diversity and semantic deduplication")
+    page_number: Optional[int] = Field(None, ge=1, description="Page number in source document (for PDFs)")
+    section: Optional[str] = Field(None, max_length=500, description="Section heading in document")
 
     class Config:
         json_schema_extra = {

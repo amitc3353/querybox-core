@@ -22,10 +22,10 @@ class TestLLMFactory:
     """Test LLM provider factory function"""
 
     def test_get_provider_default(self):
-        """Test factory returns default provider (ollama)"""
+        """Test factory returns default provider (openrouter)"""
         provider = get_llm_provider()
         assert isinstance(provider, LLMProvider)
-        assert isinstance(provider, OllamaProvider)
+        assert isinstance(provider, OpenRouterProvider)
 
     def test_get_provider_ollama_explicit(self):
         """Test factory returns Ollama when explicitly requested"""

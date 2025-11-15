@@ -37,6 +37,16 @@ from app.models.document import ProcessingStageEnum, StageStatusEnum
 # TEST FIXTURES
 # ============================================================================
 
+@pytest.fixture(autouse=True)
+def fast_retry():
+    """
+    Mock time.sleep to avoid delays in retry logic for faster tests.
+    This fixture is autouse=True so it applies to all tests in this module.
+    """
+    with patch('time.sleep', return_value=None):
+        yield
+
+
 @pytest.fixture
 def mock_db_session():
     """Mock database session"""

@@ -1361,7 +1361,7 @@ class MultiQuerySearchResponse(SearchResponse):
     latency_ms: float
 
     # Multi-Query specific fields
-    retrieval_mode_used: str = "standard"  # Indicates which mode was used
+    retrieval_mode_used: str = "multi_query" # "standard"  # Indicates which mode was used
     query_variations: Optional[List[str]] = None  # If multi_query
     fusion_metadata: Optional[Dict] = None  # If multi_query
 

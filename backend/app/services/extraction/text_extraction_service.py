@@ -170,12 +170,12 @@ class DocumentTextExtractor:
                     detected_language=detected_language,
                 )
 
-            # Check if converter is None and not initialized
-            if self.converter is None and self.parser is None:
-                raise Exception("Text extraction service not available")
-
-            # Get parser from factory
+            # Get parser from factory (lazy initialization)
             parser = self._get_parser()
+
+            # Verify parser was initialized successfully
+            if parser is None:
+                raise Exception("Text extraction service not available")
 
             logger.info(f"Starting text extraction for document {document_id} ({mime_type}) using {type(parser).__name__}")
 
@@ -506,6 +506,9 @@ class DocumentTextExtractor:
             DocumentText instance if successful, None otherwise
         """
         try:
+            # Clean text: Remove NULL bytes (PostgreSQL doesn't allow them)
+            cleaned_text = result.full_text.replace('\x00', '') if result.full_text else ''
+
             # Check if text already exists (update scenario)
             existing = db.query(DocumentText).filter(
                 DocumentText.document_id == document_id
@@ -513,7 +516,7 @@ class DocumentTextExtractor:
 
             if existing:
                 # Update existing record
-                existing.full_text = result.full_text
+                existing.full_text = cleaned_text
                 existing.text_length = result.text_length
                 existing.extraction_method = result.extraction_method
                 existing.extraction_engine = result.extraction_engine
@@ -534,7 +537,7 @@ class DocumentTextExtractor:
                 # Create new record
                 document_text = DocumentText(
                     document_id=document_id,
-                    full_text=result.full_text,
+                    full_text=cleaned_text,
                     text_length=result.text_length,
                     extraction_method=result.extraction_method,
                     extraction_engine=result.extraction_engine,

@@ -123,8 +123,14 @@ async def upload_document(
     """
     document_id = uuid4()
     temp_storage_result = None
-    
+
     try:
+        # Log upload request details
+        logger.info(
+            f"Upload request received: filename={file.filename}, "
+            f"content_type={file.content_type}, size={file.size}, force_new={force_new}"
+        )
+
         # Convert workspace_id to UUID (use default for MVP)
         if workspace_id:
             workspace_uuid = UUID(workspace_id)
@@ -133,15 +139,18 @@ async def upload_document(
             workspace_uuid = UUID("00000000-0000-0000-0000-000000000000")
         
         # Step 1: Basic validation
-        if file.size > settings.MAX_FILE_SIZE:
+        # Note: file.size might be None for some uploads, we'll check actual size later
+        if file.size and file.size > settings.MAX_FILE_SIZE:
+            logger.warning(f"File size exceeds limit: {file.size} > {settings.MAX_FILE_SIZE}")
             raise HTTPException(
                 status_code=413,
                 detail=f"File size exceeds maximum allowed size of {settings.MAX_FILE_SIZE / (1024 * 1024):.1f}MB"
             )
-        
+
         # Step 2: Extension validation
         file_extension = Path(file.filename).suffix.lower()
         if file_extension not in settings.ALLOWED_EXTENSIONS:
+            logger.warning(f"File type not allowed: {file_extension}, filename: {file.filename}")
             raise HTTPException(
                 status_code=400,
                 detail=f"File type '{file_extension}' not allowed. Allowed types: {', '.join(settings.ALLOWED_EXTENSIONS)}"
@@ -164,9 +173,13 @@ async def upload_document(
         
         # Verify MIME type is in allowed list
         if detected_mime not in storage_settings.ALLOWED_MIME_TYPES:
+            logger.warning(
+                f"MIME type not allowed: {detected_mime} for file {file.filename}. "
+                f"Allowed types: {storage_settings.ALLOWED_MIME_TYPES}"
+            )
             raise HTTPException(
                 status_code=400,
-                detail=f"MIME type '{detected_mime}' not allowed"
+                detail=f"MIME type '{detected_mime}' not allowed. Allowed types: {', '.join(storage_settings.ALLOWED_MIME_TYPES)}"
             )
         
         # Reset file for StorageManager

@@ -30,19 +30,22 @@ logger = logging.getLogger(__name__)
 # PROMPT TEMPLATE
 # ============================================================================
 
-ANSWER_PROMPT_TEMPLATE = """You are a precise question-answering assistant. Generate answers ONLY from provided passages.
+ANSWER_PROMPT_TEMPLATE = """You are a helpful assistant that answers questions using ONLY the provided document passages.
 
-PASSAGES:
+CONTEXT PASSAGES:
 {context}
 
-INSTRUCTIONS:
-1. Answer the question using ONLY information from passages above
-2. Cite every claim with [1], [2] notation matching passage numbers
-3. If answer not found in passages, respond: "I cannot answer this based on the provided documents."
-4. Break answer into 3-5 atomic propositions (one claim per sentence)
-5. Use exact quotes when possible, indicate with quotation marks
+RULES:
+1. Answer the question using ONLY information from the passages above
+2. Cite sources using [1], [2], etc. matching the passage numbers shown
+3. Provide a complete, detailed answer - don't be brief
+4. Use direct quotes from passages when possible
+5. If the answer is not in the passages, say: "I cannot answer this based on the provided documents."
+6. DO NOT make up information or use external knowledge
 
 QUESTION: {query}
+
+Please provide a detailed answer to the question above using the context passages. Remember to cite your sources with [1], [2], etc.
 
 ANSWER:"""
 
@@ -93,7 +96,7 @@ class AnswerService:
 
     # Context management
     MAX_CONTEXT_TOKENS = 6000
-    MAX_COMPLETION_TOKENS = 2000
+    MAX_COMPLETION_TOKENS = 3000  # Increased for more detailed answers
 
     # Caching
     CACHE_TTL_SECONDS = 3600  # 1 hour
@@ -280,10 +283,7 @@ class AnswerService:
         request: AnswerRequest
     ) -> List[Passage]:
         """
-        Retrieve relevant passages using search service
-
-        TODO: Integrate with actual search service from Step 10
-        For now, returns mock passages for testing
+        Retrieve relevant passages using hybrid search service
 
         Args:
             request: Answer request
@@ -291,38 +291,73 @@ class AnswerService:
         Returns:
             List of Passage objects sorted by relevance
         """
-        # TODO: Replace with actual search service call
-        # from app.services.search_service import SearchService
-        # search_service = SearchService()
-        # results = await search_service.hybrid_search(
-        #     query=request.query,
-        #     document_ids=request.document_ids,
-        #     top_k=request.top_k * 4  # Get more candidates for reranking
-        # )
+        from app.db.database import get_db
+        from app.services.search.hybrid_search_service import get_hybrid_search_service
+        from app.services.search.bm25_search_service import get_bm25_search_service
+        from app.services.search.vector_search_service import get_vector_search_service
+        from app.services.search.rrf_ranker import get_rrf_ranker
+        from app.services.search.reranking_pipeline import get_reranking_pipeline
+        from app.services.embeddings import get_embedding_service
+        from app.schemas.search import SearchFilters
 
-        logger.warning("Using mock retrieval - TODO: integrate search service")
+        # Get database session
+        db = next(get_db())
 
-        # Mock passages for testing
-        mock_passages = [
-            Passage(
-                text="The return policy allows customers to return items within 30 days of purchase. Items must be in original condition with tags attached.",
-                document_id="550e8400-e29b-41d4-a716-446655440000",
-                document_name="Return_Policy.pdf",
-                rerank_score=0.95,
-                page=1,
-                section="Return Policy"
-            ),
-            Passage(
-                text="Refunds are processed within 5-7 business days after we receive the returned item. Refunds are issued to the original payment method.",
-                document_id="550e8400-e29b-41d4-a716-446655440000",
-                document_name="Return_Policy.pdf",
-                rerank_score=0.88,
-                page=1,
-                section="Refund Process"
-            ),
-        ]
+        try:
+            # Build filters from document_ids if provided
+            filters = None
+            if request.document_ids:
+                filters = SearchFilters(document_ids=request.document_ids)
 
-        return mock_passages
+            # Initialize search services
+            embedding_service = get_embedding_service()
+            bm25_service = get_bm25_search_service(db)
+            vector_service = get_vector_search_service(db, embedding_service)
+            rrf_ranker = get_rrf_ranker()
+            reranking_pipeline = get_reranking_pipeline()
+
+            # Create hybrid search service
+            hybrid_search = get_hybrid_search_service(
+                db=db,
+                bm25_service=bm25_service,
+                vector_service=vector_service,
+                rrf_ranker=rrf_ranker,
+                reranking_pipeline=reranking_pipeline
+            )
+
+            # Execute hybrid search with reranking
+            search_response = hybrid_search.search(
+                query=request.query,
+                filters=filters,
+                limit=request.top_k * 4,  # Get more candidates for context window fitting
+                offset=0,
+                enable_reranking=True,
+                rerank_top_k=request.top_k * 2
+            )
+
+            # Convert search results to Passage objects
+            passages = []
+            for result in search_response.results:
+                passages.append(
+                    Passage(
+                        text=result.snippet,
+                        document_id=str(result.document_id),
+                        document_name=result.document_name,
+                        rerank_score=result.relevance_score,
+                        page=result.page_number,
+                        section=result.section,
+                        chunk_index=result.chunk_index
+                    )
+                )
+
+            logger.info(
+                f"Retrieved {len(passages)} passages via hybrid search for query: {request.query[:50]}..."
+            )
+
+            return passages
+
+        finally:
+            db.close()
 
     # ========================================================================
     # CONTEXT MANAGEMENT
@@ -516,15 +551,25 @@ class AnswerService:
 
     def _build_citations(self, passages: List[Passage]) -> List[Citation]:
         """
-        Build citation list from passages
+        Build citation list from passages, filtering out very weak citations
+
+        Strategy:
+        - Always include STRONG citations (score >= 0.8)
+        - Include MEDIUM citations (score >= 0.6)
+        - Include WEAK citations (score >= 0.4) only if we have < 3 citations
+        - Filter out very weak citations (score < 0.4) unless it's the only result
 
         Args:
             passages: Passages used for answer
 
         Returns:
-            List of Citation objects
+            List of Citation objects (filtered for quality)
         """
         citations = []
+        STRONG_THRESHOLD = 0.8
+        MEDIUM_THRESHOLD = 0.6
+        WEAK_THRESHOLD = 0.4
+        MIN_CITATIONS = 3  # Always show at least 3 if available
 
         for i, passage in enumerate(passages):
             # Generate chunk_id from document_id and chunk_index
@@ -532,9 +577,9 @@ class AnswerService:
             chunk_id = f"chunk_{passage.document_id}_{chunk_index}"
 
             # Determine citation quality based on relevance score
-            if passage.rerank_score >= 0.8:
+            if passage.rerank_score >= STRONG_THRESHOLD:
                 quality = "STRONG"
-            elif passage.rerank_score >= 0.6:
+            elif passage.rerank_score >= MEDIUM_THRESHOLD:
                 quality = "MEDIUM"
             else:
                 quality = "WEAK"
@@ -544,25 +589,62 @@ class AnswerService:
             if "." in passage.document_name:
                 file_type = passage.document_name.split(".")[-1].lower()
 
-            citations.append(
-                Citation(
-                    chunk_id=chunk_id,
-                    document_id=passage.document_id,
-                    document_filename=passage.document_name,
-                    content=passage.text[:1000],  # Limit to 1000 chars
-                    page_number=passage.page,
-                    chunk_index=chunk_index,
-                    relevance_score=passage.rerank_score,
-                    quality=quality,
-                    citation_number=i + 1,  # Add citation number (1-indexed)
-                    metadata={
-                        "file_type": file_type,
-                        "upload_date": datetime.now().isoformat()
-                    }
-                )
+            citation = Citation(
+                chunk_id=chunk_id,
+                document_id=passage.document_id,
+                document_filename=passage.document_name,
+                content=passage.text[:1000],  # Limit to 1000 chars
+                page_number=passage.page,
+                chunk_index=chunk_index,
+                relevance_score=passage.rerank_score,
+                quality=quality,
+                citation_number=i + 1,  # Add citation number (1-indexed)
+                metadata={
+                    "file_type": file_type,
+                    "upload_date": datetime.now().isoformat()
+                }
             )
 
-        return citations
+            citations.append(citation)
+
+        # Filter citations by quality
+        # Strategy: Keep high-quality citations, limit low-quality ones
+        strong_citations = [c for c in citations if c.quality == "STRONG"]
+        medium_citations = [c for c in citations if c.quality == "MEDIUM"]
+        weak_citations = [c for c in citations if c.quality == "WEAK"]
+
+        # Build final citation list
+        filtered_citations = []
+
+        # Always include STRONG citations
+        filtered_citations.extend(strong_citations)
+
+        # Add MEDIUM citations if we need more
+        if len(filtered_citations) < MIN_CITATIONS:
+            filtered_citations.extend(medium_citations)
+
+        # Only add WEAK citations if we're still below minimum
+        # and only add the best weak ones (score >= 0.4)
+        if len(filtered_citations) < MIN_CITATIONS:
+            high_weak = [c for c in weak_citations if c.relevance_score >= WEAK_THRESHOLD]
+            needed = MIN_CITATIONS - len(filtered_citations)
+            filtered_citations.extend(high_weak[:needed])
+
+        # If we still have nothing, include at least the top result
+        if not filtered_citations and citations:
+            filtered_citations = [citations[0]]
+
+        # Renumber citations sequentially
+        for i, citation in enumerate(filtered_citations):
+            citation.citation_number = i + 1
+
+        logger.info(
+            f"Citations filtered: {len(citations)} -> {len(filtered_citations)} "
+            f"(STRONG: {len(strong_citations)}, MEDIUM: {len(medium_citations)}, "
+            f"WEAK kept: {len([c for c in filtered_citations if c.quality == 'WEAK'])})"
+        )
+
+        return filtered_citations
 
     # ========================================================================
     # CONFIDENCE SCORING

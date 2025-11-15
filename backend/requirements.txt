@@ -35,6 +35,7 @@ beautifulsoup4==4.12.3
 pytesseract==0.3.10
 Pillow>=10.0.0  # Image processing for Vision API (Phase 2.4)
 PyMuPDF>=1.24.0  # PDF image extraction for Vision API (Phase 2.4)
+docling>=1.0.0  # Advanced document parsing
 
 # AI and embeddings
 openai>=1.54.0  # Updated for Vision API support (Phase 2.4)
@@ -46,6 +47,7 @@ torch==2.3.0
 transformers==4.40.0
 scikit-learn==1.4.2
 rapidfuzz==3.6.1
+huggingface-hub>=0.20.0  # For HF Inference API embeddings
 
 # Vector database
 pgvector==0.2.4
@@ -74,7 +76,6 @@ mypy==1.7.1
 
 # Monitoring and logging
 structlog==23.2.0
-sentry-sdk[fastapi]==1.38.0
+sentry-sdk[fastapi]>=2.44.0
 prometheus-client==0.19.0
 psutil>=7.0.0
-logtail-python==0.3.4  # Better Stack logging integration

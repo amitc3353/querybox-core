@@ -21,6 +21,18 @@ from app.schemas.answer import AnswerRequest
 # FIXTURES
 # ============================================================================
 
+@pytest.fixture(autouse=True)
+def fast_retry_for_ollama():
+    """
+    Patch tenacity retry to use minimal delays for faster Ollama client tests.
+    This fixture is autouse=True so it applies to all tests in this module.
+    """
+    from tenacity import wait_fixed
+
+    with patch('app.services.ollama_client.wait_exponential', return_value=wait_fixed(0.01)):
+        yield
+
+
 @pytest.fixture
 def answer_service():
     """Create AnswerService instance for testing"""
@@ -403,10 +415,11 @@ def test_build_prompt_format(answer_service):
 
     prompt = answer_service._build_prompt("Query?", passages)
 
-    assert "PASSAGES:" in prompt
+    # Check for new prompt format (updated in Phase 5)
+    assert "CONTEXT PASSAGES:" in prompt
     assert "QUESTION:" in prompt
     assert "ANSWER:" in prompt
-    assert "INSTRUCTIONS:" in prompt
+    assert "RULES:" in prompt
 
 
 # ============================================================================

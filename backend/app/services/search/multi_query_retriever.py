@@ -91,7 +91,7 @@ class MultiQueryRetriever:
     async def retrieve(
         self,
         query: str,
-        client_id: int,
+        client_id: int = None,  # Not used by HybridSearchService, kept for API compatibility
         top_k: int = 10,
         filters: Optional[SearchFilters] = None,
         enable_reranking: bool = True,
@@ -122,10 +122,10 @@ class MultiQueryRetriever:
                 enabled=self.settings.MULTI_QUERY_ENABLED,
                 llm_available=self.llm_provider is not None,
             )
-            return await self.hybrid_search.search(
+            # HybridSearchService.search() is NOT async
+            return self.hybrid_search.search(
                 query=query,
-                client_id=client_id,
-                top_k=top_k,
+                limit=top_k,
                 filters=filters,
                 enable_reranking=enable_reranking,
             )
@@ -145,7 +145,6 @@ class MultiQueryRetriever:
             # Step 2: Execute parallel searches
             all_results = await self._parallel_search(
                 queries=[query] + variations,  # Include original query
-                client_id=client_id,
                 top_k=top_k * 3,  # Fetch 3x results for fusion
                 filters=filters,
                 enable_reranking=enable_reranking,
@@ -203,10 +202,10 @@ class MultiQueryRetriever:
             )
 
             if self.settings.MULTI_QUERY_FALLBACK_ON_ERROR:
-                return await self.hybrid_search.search(
+                # HybridSearchService.search() is NOT async
+                return self.hybrid_search.search(
                     query=query,
-                    client_id=client_id,
-                    top_k=top_k,
+                    limit=top_k,
                     filters=filters,
                     enable_reranking=enable_reranking,
                 )
@@ -373,7 +372,6 @@ Generate exactly {num_variations} alternative queries. Format as a numbered list
     async def _parallel_search(
         self,
         queries: List[str],
-        client_id: int,
         top_k: int,
         filters: Optional[SearchFilters],
         enable_reranking: bool,
@@ -397,10 +395,10 @@ Generate exactly {num_variations} alternative queries. Format as a numbered list
         async def search_single(query: str) -> List[SearchResultItem]:
             """Helper to search and extract results."""
             try:
-                response = await self.hybrid_search.search(
+                # HybridSearchService.search() is NOT async, don't await it
+                response = self.hybrid_search.search(
                     query=query,
-                    client_id=client_id,
-                    top_k=top_k,
+                    limit=top_k,
                     filters=filters,
                     enable_reranking=enable_reranking,
                 )
@@ -484,8 +482,10 @@ Generate exactly {num_variations} alternative queries. Format as a numbered list
                 rrf_score = 1.0 / (rank + 60)
                 chunk_data[chunk_key]['rrf_scores'].append(rrf_score)
 
-        # Calculate final scores
+        # Calculate final scores (unnormalized)
         scored_chunks = []
+        max_score = 0.0
+
         for chunk_key, data in chunk_data.items():
             frequency = data['frequency']
             avg_rrf_score = sum(data['rrf_scores']) / len(data['rrf_scores'])
@@ -499,8 +499,15 @@ Generate exactly {num_variations} alternative queries. Format as a numbered list
             # Update item's relevance_score with fused score
             item = data['item']
             item.relevance_score = final_score
-
             scored_chunks.append(item)
+
+            # Track max score for normalization
+            max_score = max(max_score, final_score)
+
+        # Normalize scores to [0, 1] range
+        if max_score > 0:
+            for item in scored_chunks:
+                item.relevance_score = item.relevance_score / max_score
 
         # Sort by final score (descending) and return top_k
         scored_chunks.sort(key=lambda x: x.relevance_score, reverse=True)

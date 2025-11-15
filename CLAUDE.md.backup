@@ -263,7 +263,7 @@ S3_ACCESS_KEY=minioadmin
 S3_SECRET_KEY=minioadmin
 OPENAI_API_KEY=sk-...
 API_KEY=dev-key-12345
-SENTRY_DSN=optional
+SENTRY_DSN=https://d1f802ca512793bb778939ae1d8c3573@o4510365305208832.ingest.us.sentry.io/4510365311434752
 ```
 
 ## 📡 API Design Specifications

@@ -1,9 +1,9 @@
 # QueryBox Backend RAG Optimization - Implementation Context
 
-**Last Updated**: Jan 13, 2025 - Evening
-**Current Phase**: Phase 5.2 COMPLETE ✅ (Multi-Query RAG Integration)
-**Time Invested**: ~13.5 hours total (Phase 1: 3.5h, Phase 2: ~3.5h, Phase 3: 3h, Phase 4: ~4h infrastructure, Phase 5.1-5.2: ~3h)
-**Next Priority**: Phase 5.4 (Integration Testing) or Phase 6 (RAGAs Evaluation)
+**Last Updated**: Jan 14, 2025 - Morning
+**Current Phase**: Phase 5.3 COMPLETE ✅ (Multi-Query RAG End-to-End Integration)
+**Time Invested**: ~15 hours total (Phase 1: 3.5h, Phase 2: ~3.5h, Phase 3: 3h, Phase 4: ~4h infrastructure, Phase 5.1-5.3: ~4.5h)
+**Next Priority**: Phase 5.4 (Integration Testing) or Phase 5.5 (Performance Benchmarking)
 
 ---
 
@@ -14,13 +14,13 @@
 - **Phase 2.1-2.4: Parsing Optimization - Smart Router + Vision API** ✅
 - Phase 3.1-3.5: OpenRouter LLM + OpenAI Embeddings providers ✅
 - Phase 4.1-4.2: Qdrant infrastructure ready (disabled, ready for activation) ✅
-- **Phase 5.1-5.2: Multi-Query RAG Implementation & Integration** ✅
+- **Phase 5.1-5.3: Multi-Query RAG - Implementation, Config & API Integration** ✅
 
 **⚠️ In Progress:**
-- None (clean stopping point - Phase 5.1-5.2 complete!)
+- None (clean stopping point - Phase 5.3 complete, working end-to-end!)
 
 **🎯 Next Up:**
-- Phase 5.4: Integration testing with real LLM & Redis
+- Phase 5.4: Integration testing with various query types
 - Phase 5.5: Performance benchmarking (target: 15-25% accuracy improvement)
 - Phase 6: RAGAs Evaluation & Tuning
 - Optional: Enable Qdrant for 10x faster vector search
@@ -615,10 +615,11 @@ MULTI_QUERY_LLM_PROVIDER=openrouter  # Use GPT-4o-mini for variations
 
 ---
 
-## ✅ Phase 5.2-5.3 COMPLETE - Configuration & API Integration
+## ✅ Phase 5.2-5.3 COMPLETE - End-to-End Multi-Query RAG Integration
 
-**Total Time**: ~30 minutes
-**Status**: Configuration fixed, API integration verified
+**Total Time**: ~1.5 hours
+**Status**: ✅ COMPLETE AND TESTED - Working end-to-end!
+**Test Result**: Multi-query metadata successfully returned in API responses
 
 ### What Was Completed
 
@@ -628,39 +629,90 @@ MULTI_QUERY_LLM_PROVIDER=openrouter  # Use GPT-4o-mini for variations
 - Compatible with search endpoint's Redis client initialization
 - Tested: `redis://localhost:6379/0` → host=localhost, port=6379, db=0
 
-**2. Service Compatibility Fix** (`backend/app/api/v1/endpoints/search.py` - line 539)
-- Changed from `unified_search_service` to `hybrid_search_service`
-- MultiQueryRetriever requires async `HybridSearchService`, not sync `SearchService`
-- Ensures parallel search execution works correctly
+**2. HybridSearchService Dependency Injection** (`backend/app/api/v1/endpoints/search.py` - lines 540-558)
+- Fixed service instantiation to pass all required dependencies
+- Instantiate BM25, Vector, RRF, and Reranking services before creating HybridSearchService
+- Ensures MultiQueryRetriever has working search backend
 
-**3. Configuration Verification**
-- ✅ RETRIEVAL_MODE setting exists in config.py (line 447)
-- ✅ MULTI_QUERY_* settings exist in config.py (lines 450-471)
-- ✅ Documentation exists in .env.example (lines 577-608)
-- ✅ API endpoint integration already done (lines 533-593)
+**3. Parameter Compatibility Fixes** (`backend/app/services/search/multi_query_retriever.py`)
+- Removed `client_id` parameter (not accepted by HybridSearchService)
+- Changed `top_k` to `limit` (correct parameter name)
+- Made `client_id` optional in `retrieve()` signature for API compatibility
 
-**4. Testing**
-- ✅ All 17 unit tests passing
-- ✅ Redis URL parsing verified
-- ✅ Import structure validated
+**4. Async/Sync Mismatch Fix** (`backend/app/services/search/multi_query_retriever.py` - lines 126, 206, 397)
+- **Critical Fix**: Removed `await` from `HybridSearchService.search()` calls
+- HybridSearchService.search() is synchronous, not async
+- Fixed in 3 locations: fallback (line 126), error fallback (line 206), parallel search helper (line 397)
+
+**5. Score Normalization** (`backend/app/services/search/multi_query_retriever.py` - lines 485-510)
+- **Critical Fix**: Added score normalization to [0, 1] range
+- Fusion scores were exceeding 1.0 (up to 6.0), violating Pydantic schema validation
+- Normalize by max score after fusion, before sorting
+
+**6. Multi-Query Metadata Preservation** (`backend/app/api/v1/endpoints/search.py` - lines 646-648, 677-679)
+- **Critical Fix**: Added `multi_query_metadata` to SearchResponseWithCitations
+- Modified both citation extraction paths (success and error fallback)
+- Metadata now included in API response when Multi-Query RAG is used
+
+**7. API Key Configuration** (`backend/.env`)
+- Fixed API key formatting (removed leading spaces)
+- Added Multi-Query configuration block
+- ⚠️ **Security Note**: User should regenerate exposed keys at:
+  - OpenRouter: https://openrouter.ai/keys
+  - OpenAI: https://platform.openai.com/api-keys
+
+### Test Results - End-to-End Validation ✅
+
+**Test Query**: "artificial intelligence applications"
+
+**Multi-Query Metadata** (successfully returned):
+```json
+{
+  "query_variations": [
+    "applications of machine learning technology",
+    "uses of AI in various industries"
+  ],
+  "cost_usd": 0.00003015,
+  "cache_hit": false,
+  "num_queries_searched": 3,
+  "total_chunks_before_fusion": 27,
+  "fusion_algorithm": "frequency_rrf",
+  "freq_weight": 2.0,
+  "rrf_weight": 1.0
+}
+```
+
+**Search Results**:
+- ✅ Success: True
+- ✅ Total Results: 5
+- ✅ Processing Time: 21,903ms (~22 seconds)
+- ✅ Citations: 3 per result
+- ✅ Top Relevance Score: 1.0000 (normalized)
+
+**Cache Performance**:
+- First Query: Cost $0.00003015, Cache Hit: False
+- Second Query (same): Cost $0.00, Cache Hit: True ✅
 
 ### Current State After Phase 5.2-5.3
 
-**Phase 5.2-5.3 Configuration & Integration Complete** ✅
-1. ✅ Redis connection properties working
+**Phase 5.2-5.3 End-to-End Integration Complete** ✅
+1. ✅ Redis connection and caching working
 2. ✅ HybridSearchService properly integrated
-3. ✅ RETRIEVAL_MODE routing functional
-4. ✅ Multi-Query RAG accessible via `/hybrid` endpoint
-5. ✅ Graceful fallback to standard search
+3. ✅ Async/sync compatibility fixed
+4. ✅ Score normalization working
+5. ✅ Multi-query metadata in API responses
+6. ✅ LLM cost tracking functional
+7. ✅ Parallel search execution working
+8. ✅ Frequency-based fusion working
 
-**How to Use** (Ready Now):
+**How to Use** (Working Now!):
 ```bash
 # In backend/.env
 RETRIEVAL_MODE=multi_query
 MULTI_QUERY_ENABLED=true
 MULTI_QUERY_NUM_VARIATIONS=2
 MULTI_QUERY_LLM_PROVIDER=openrouter
-OPENROUTER_API_KEY=sk-or-v1-your-key
+OPENROUTER_API_KEY=sk-or-v1-your-key  # No leading spaces!
 
 # Redis (optional, for caching)
 REDIS_URL=redis://localhost:6379/0
@@ -679,17 +731,27 @@ curl -X POST http://localhost:8000/api/v1/search/hybrid \
   }'
 ```
 
-**Response Includes**:
-- Query variations generated
-- Cost tracking (USD)
-- Cache hit status
-- Fusion statistics
+**Response Now Includes**:
+- ✅ Query variations generated
+- ✅ Cost tracking (USD)
+- ✅ Cache hit status
+- ✅ Fusion statistics
+- ✅ All fields properly validated (scores 0-1)
 
-**Still Needed** (Phase 5.4-5.5):
-- ⏭️ Integration testing with real OpenRouter API
-- ⏭️ Verify Redis caching works end-to-end
-- ⏭️ Benchmark latency impact (<200ms target)
-- ⏭️ Measure accuracy improvement (15-25% target)
+**Issues Fixed** (7 total):
+1. Redis configuration parsing
+2. API key formatting (leading spaces removed)
+3. HybridSearchService dependency injection
+4. Parameter compatibility (client_id, top_k → limit)
+5. Async/sync mismatch (critical)
+6. Score normalization (critical)
+7. Missing multi_query_metadata in response (critical)
+
+**Next Steps** (Phase 5.4-5.5):
+- ⏭️ Integration testing with various query types
+- ⏭️ Optimize processing time (currently ~22 seconds)
+- ⏭️ Benchmark accuracy improvement (target: 15-25%)
+- ⏭️ Load testing with concurrent requests
 
 ---
 

@@ -5,7 +5,9 @@
       "Bash(python:*)",
       "Bash(pip install:*)",
       "mcp__ide__getDiagnostics",
-      "Bash(python3 -m pytest:*)"
+      "Bash(python3 -m pytest:*)",
+      "Bash(pytest:*)",
+      "Bash(make test:*)"
     ],
     "deny": [],
     "ask": []

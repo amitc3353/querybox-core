@@ -48,7 +48,7 @@ class TestMultiQueryRetriever:
     def mock_hybrid_search(self):
         """Create mock HybridSearchService"""
         service = Mock(spec=HybridSearchService)
-        service.search = AsyncMock()
+        service.search = Mock()  # HybridSearchService.search() is NOT async
         return service
 
     @pytest.fixture
@@ -228,7 +228,6 @@ class TestMultiQueryRetriever:
         queries = ["query 1", "query 2", "query 3"]
         results = await retriever._parallel_search(
             queries=queries,
-            client_id=1,
             top_k=10,
             filters=None,
             enable_reranking=False,
@@ -246,7 +245,7 @@ class TestMultiQueryRetriever:
         call_count = {'count': 0}
 
         # First search succeeds, second fails, third succeeds
-        async def search_side_effect(*args, **kwargs):
+        def search_side_effect(*args, **kwargs):
             call_count['count'] += 1
             if call_count['count'] == 2:
                 raise Exception("Search error")
@@ -260,13 +259,12 @@ class TestMultiQueryRetriever:
                 filters_applied={}
             )
 
-        mock_hybrid_search.search = AsyncMock(side_effect=search_side_effect)
+        mock_hybrid_search.search = Mock(side_effect=search_side_effect)
 
         # Execute
         queries = ["query 1", "query 2", "query 3"]
         results = await retriever._parallel_search(
             queries=queries,
-            client_id=1,
             top_k=10,
             filters=None,
             enable_reranking=False,
@@ -549,3 +547,176 @@ These are semantically similar."""
 
             assert isinstance(retriever, MultiQueryRetriever)
             assert retriever.hybrid_search == mock_hybrid_search
+
+    # ========================================
+    # Test: Edge Cases
+    # ========================================
+
+    @pytest.mark.asyncio
+    async def test_retrieve_with_empty_query(self, retriever, mock_hybrid_search):
+        """Test retrieval with empty query string"""
+        from app.schemas.search import SearchResponse
+
+        mock_response = SearchResponse(
+            success=True,
+            query="",
+            total_results=0,
+            returned_results=0,
+            results=[],
+            processing_time_ms=10,
+            filters_applied={}
+        )
+        mock_hybrid_search.search.return_value = mock_response
+
+        response = await retriever.retrieve(
+            query="",
+            client_id=1,
+            top_k=10,
+            filters=None,
+            enable_reranking=False,
+        )
+
+        assert response.success is True
+        assert len(response.results) == 0
+
+    @pytest.mark.asyncio
+    async def test_retrieve_with_very_long_query(self, retriever, mock_hybrid_search):
+        """Test retrieval with very long query (> 1000 chars)"""
+        from app.schemas.search import SearchResponse
+        from app.services.llm.base import LLMResponse
+
+        long_query = "machine learning " * 100  # ~1700 chars
+
+        # Mock LLM response
+        mock_llm_response = LLMResponse(
+            text="1. ML algorithms\n2. Machine learning techniques",
+            tokens_input=200,
+            tokens_output=20,
+            model="openai/gpt-4o-mini",
+            latency_ms=150
+        )
+        retriever.llm_provider.generate = Mock(return_value=mock_llm_response)
+
+        mock_response = SearchResponse(
+            success=True,
+            query=long_query,
+            total_results=0,
+            returned_results=0,
+            results=[],
+            processing_time_ms=50,
+            filters_applied={}
+        )
+        mock_hybrid_search.search.return_value = mock_response
+
+        response = await retriever.retrieve(
+            query=long_query,
+            client_id=1,
+            top_k=10,
+            filters=None,
+            enable_reranking=False,
+        )
+
+        assert response.success is True
+
+    def test_parse_variations_with_no_numbered_list(self, retriever):
+        """Test parsing when LLM returns non-numbered format"""
+        llm_response = """Here are some variations:
+        - What is machine learning?
+        - How does ML work?"""
+
+        variations = retriever._parse_variations(llm_response)
+
+        # Should extract what it can or return empty
+        assert isinstance(variations, list)
+
+    def test_parse_variations_with_empty_response(self, retriever):
+        """Test parsing when LLM returns empty string"""
+        variations = retriever._parse_variations("")
+
+        assert variations == []
+
+    def test_fuse_results_all_zero_scores(self, retriever):
+        """Test fusion when all results have zero relevance scores"""
+        doc_id = str(uuid4())
+
+        results = [[
+            SearchResultItem(
+                document_id=doc_id,
+                chunk_index=1,
+                relevance_score=0.0,
+                document_name="doc1.pdf",
+                snippet="test",
+                chunk_position=None,
+                extraction_quality=0.9,
+                document_type="application/pdf",
+                created_at=datetime.now(timezone.utc)
+            )
+        ]]
+
+        fused = retriever._fuse_results(results, top_k=10)
+
+        assert len(fused) == 1
+        assert fused[0].relevance_score >= 0.0
+
+    def test_fuse_results_with_identical_chunks(self, retriever):
+        """Test fusion when multiple queries return identical chunks"""
+        doc_id = str(uuid4())
+
+        # Same chunk appears in all 3 queries with different scores
+        chunk = SearchResultItem(
+            document_id=doc_id,
+            chunk_index=1,
+            relevance_score=0.8,
+            document_name="doc1.pdf",
+            snippet="identical content",
+            chunk_position=None,
+            extraction_quality=0.9,
+            document_type="application/pdf",
+            created_at=datetime.now(timezone.utc)
+        )
+
+        results = [[chunk], [chunk], [chunk]]
+
+        fused = retriever._fuse_results(results, top_k=10)
+
+        # Should deduplicate and boost score due to frequency
+        assert len(fused) == 1
+        assert fused[0].relevance_score > 0.8  # Boosted by frequency
+
+    @pytest.mark.asyncio
+    async def test_retrieve_with_unicode_query(self, retriever, mock_hybrid_search):
+        """Test retrieval with Unicode characters in query"""
+        from app.schemas.search import SearchResponse
+        from app.services.llm.base import LLMResponse
+
+        unicode_query = "¿Qué es machine learning? 机器学习"
+
+        mock_llm_response = LLMResponse(
+            text="1. What is ML?\n2. Machine learning explanation",
+            tokens_input=30,
+            tokens_output=15,
+            model="openai/gpt-4o-mini",
+            latency_ms=100
+        )
+        retriever.llm_provider.generate = Mock(return_value=mock_llm_response)
+
+        mock_response = SearchResponse(
+            success=True,
+            query=unicode_query,
+            total_results=0,
+            returned_results=0,
+            results=[],
+            processing_time_ms=50,
+            filters_applied={}
+        )
+        mock_hybrid_search.search.return_value = mock_response
+
+        response = await retriever.retrieve(
+            query=unicode_query,
+            client_id=1,
+            top_k=10,
+            filters=None,
+            enable_reranking=False,
+        )
+
+        assert response.success is True

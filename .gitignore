@@ -117,3 +117,8 @@ dmypy.json
 # Pytype
 .pytype/
 
+
+backend/.env.backup
+backend/.env.demo
+*.env.backup
+*.env.demo

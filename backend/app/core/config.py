@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     S3_BUCKET_NAME: str = "querybox-documents"
     
     # AI/Embeddings
-    OPENAI_API_KEY: Optional[str] = None
+    OPENAI_API_KEY: Optional[str] = "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"
 
     # ========================================
     # OpenAI Embedding Configuration (Phase 3)
@@ -73,13 +73,21 @@ class Settings(BaseSettings):
     EMBEDDING_CACHE_TTL_SECONDS: int = 1800  # 30 minutes TTL for cached embeddings
 
     # ========================================
+    # Hugging Face Inference API Configuration
+    # ========================================
+    HF_API_TOKEN: Optional[str] ="your-huggingface-token-here"# Hugging Face API token for Inference API
+    HF_INFERENCE_MODEL: str = "BAAI/bge-m3"  # Model to use via Inference API
+    HF_INFERENCE_TIMEOUT: int = 30  # API timeout in seconds
+    HF_INFERENCE_BATCH_SIZE: int = 32  # Batch size for API calls
+
+    # ========================================
     # Modular Provider Configuration (Enables swapping components via config)
     # ========================================
 
     # Parser Selection (Options: "docling", "mineru", "unstructured", "smart")
     PARSER_PRIMARY: str = "docling"  # Primary parser for document extraction
 
-    # Embedding Provider Selection (Options: "bge", "bge-m3", "openai", "cohere", "voyage")
+    # Embedding Provider Selection (Options: "bge", "bge-m3", "openai", "hf-inference", "cohere", "voyage")
     EMBEDDING_PROVIDER: str = "bge-m3"  # Embedding provider for vector generation
 
     # Vector Store Selection (Options: "pgvector", "qdrant", "lancedb", "weaviate")
@@ -265,7 +273,7 @@ class Settings(BaseSettings):
     # ========================================
     # OpenRouter provides access to multiple LLMs (GPT, Claude, Gemini, Llama)
     # Sign up at: https://openrouter.ai/
-    OPENROUTER_API_KEY: Optional[str] = None  # Required for OpenRouter (sk-or-v1-...)
+    OPENROUTER_API_KEY: Optional[str] = "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"  # Required for OpenRouter (sk-or-v1-...)
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
     OPENROUTER_MODEL: str = "openai/gpt-4o-mini"  # Default model (fast + affordable)
     OPENROUTER_APP_NAME: str = "QueryBox Core"  # App name (for OpenRouter rankings)
@@ -362,11 +370,11 @@ class Settings(BaseSettings):
     TRACK_HALLUCINATION_TRENDS: bool = True
 
     # ========================================
-    # Better Stack (Logtail) Logging Configuration (Step 13.5)
+    # Sentry Logging and Error Tracking Configuration
     # ========================================
-    LOGTAIL_SOURCE_TOKEN: Optional[str] = None
-    LOGTAIL_HOST: str = "in.logs.betterstack.com"  # US endpoint (default) or EU: s{source_id}.eu-nbg-2.betterstackdata.com
-    LOGTAIL_ENABLED: bool = True
+    SENTRY_DSN: Optional[str] = None  # Sentry Data Source Name (DSN)
+    SENTRY_ENVIRONMENT: str = "development"  # Environment: development, staging, production
+    SENTRY_TRACES_SAMPLE_RATE: float = 1.0  # % of transactions to capture (0.0-1.0)
     LOG_LEVEL: str = "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
 
     # ========================================
@@ -472,7 +480,7 @@ class Settings(BaseSettings):
     # ========================================
 
     # Retrieval Mode Selection
-    RETRIEVAL_MODE: str = "standard"  # Options: "standard" | "multi_query" | "hyde"
+    RETRIEVAL_MODE: str = "multi_query"  # Options: "standard" | "multi_query" | "hyde"
 
     # Multi-Query Feature Control
     MULTI_QUERY_ENABLED: bool = True  # Master switch for Multi-Query RAG

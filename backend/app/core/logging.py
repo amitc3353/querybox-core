@@ -1,13 +1,13 @@
 """
-Logging configuration for QueryBox Core (Step 13.5)
+Logging configuration for QueryBox Core
 
-Integrates structlog with Better Stack (Logtail) for centralized logging.
+Integrates structlog with Sentry for centralized logging and error tracking.
 Supports structured JSON logs with context propagation for multi-tenant filtering.
 """
 
 import logging
 import sys
-from typing import Any, Dict
+from typing import Any
 
 import structlog
 from structlog.types import EventDict, Processor
@@ -30,11 +30,11 @@ def add_app_context(logger: Any, method_name: str, event_dict: EventDict) -> Eve
 
 def configure_logging() -> None:
     """
-    Configure logging with structlog and Better Stack (Logtail) integration.
+    Configure logging with structlog and Sentry integration.
 
     Sets up:
     1. structlog with JSON formatting
-    2. Better Stack handler (if enabled and token provided)
+    2. Sentry for error tracking and logging (if DSN provided)
     3. Console handler for local development
     4. Context propagation for multi-tenant labels
     """
@@ -42,43 +42,46 @@ def configure_logging() -> None:
     log_level_str = settings.LOG_LEVEL.upper()
     log_level = getattr(logging, log_level_str, logging.INFO)
 
-    # Create handlers list
-    handlers: list = []
+    # Initialize Sentry (if enabled)
+    if hasattr(settings, "SENTRY_DSN") and settings.SENTRY_DSN:
+        try:
+            import sentry_sdk
+            from sentry_sdk.integrations.logging import LoggingIntegration
+
+            # Configure Sentry logging integration
+            sentry_logging = LoggingIntegration(
+                level=logging.INFO,  # Capture info and above as breadcrumbs
+                event_level=logging.ERROR  # Send errors and above as events
+            )
+
+            sentry_sdk.init(
+                dsn=settings.SENTRY_DSN,
+                environment=getattr(settings, "SENTRY_ENVIRONMENT", "development"),
+                traces_sample_rate=getattr(settings, "SENTRY_TRACES_SAMPLE_RATE", 1.0),
+                integrations=[sentry_logging],
+                # Send default PII (like user IDs) for better debugging
+                send_default_pii=True,
+                # Enable performance monitoring
+                enable_tracing=True,
+            )
+
+            print(f"✅ Sentry logging enabled (environment: {getattr(settings, 'SENTRY_ENVIRONMENT', 'development')})")
+        except ImportError:
+            print("⚠️  sentry-sdk not installed. Run: pip install sentry-sdk")
+        except Exception as e:
+            print(f"⚠️  Failed to initialize Sentry: {e}")
+    else:
+        print("ℹ️  Sentry logging disabled (no SENTRY_DSN configured)")
 
     # Console handler (always enabled for development)
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(log_level)
-    handlers.append(console_handler)
-
-    # Better Stack (Logtail) handler (if enabled)
-    if settings.LOGTAIL_ENABLED and settings.LOGTAIL_SOURCE_TOKEN:
-        try:
-            from logtail import LogtailHandler
-
-            logtail_handler = LogtailHandler(
-                source_token=settings.LOGTAIL_SOURCE_TOKEN,
-                host=settings.LOGTAIL_HOST
-            )
-            logtail_handler.setLevel(log_level)
-            handlers.append(logtail_handler)
-
-            # Log successful initialization to console
-            print(f"✅ Better Stack logging enabled (log level: {log_level_str}, host: {settings.LOGTAIL_HOST})")
-        except ImportError:
-            print("⚠️  logtail-python not installed. Run: pip install logtail-python")
-        except Exception as e:
-            print(f"⚠️  Failed to initialize Better Stack logging: {e}")
-    else:
-        if not settings.LOGTAIL_SOURCE_TOKEN:
-            print("ℹ️  Better Stack logging disabled (no LOGTAIL_SOURCE_TOKEN)")
-        else:
-            print("ℹ️  Better Stack logging disabled (LOGTAIL_ENABLED=False)")
 
     # Configure standard logging
     logging.basicConfig(
         level=log_level,
         format="%(message)s",  # structlog handles formatting
-        handlers=handlers,
+        handlers=[console_handler],
         force=True,  # Override any existing configuration
     )
 
@@ -101,7 +104,7 @@ def configure_logging() -> None:
     # Configure structlog
     structlog.configure(
         processors=shared_processors + [
-            # Render to JSON for Better Stack
+            # Render to JSON for structured logging
             structlog.processors.JSONRenderer(),
         ],
         wrapper_class=structlog.make_filtering_bound_logger(log_level),
@@ -115,7 +118,7 @@ def configure_logging() -> None:
     logger.info(
         "QueryBox logging initialized",
         log_level=log_level_str,
-        logtail_enabled=settings.LOGTAIL_ENABLED,
+        sentry_enabled=bool(hasattr(settings, "SENTRY_DSN") and settings.SENTRY_DSN),
     )
 
 

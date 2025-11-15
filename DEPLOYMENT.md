@@ -197,10 +197,10 @@ MINIO_ROOT_PASSWORD=<secure-password>
 ### Optional
 ```env
 # OpenAI (alternative to local embeddings)
-OPENAI_API_KEY=sk-...
+OPENAI_API_KEY=sk-your-openai-api-key-here
 
 # Monitoring
-SENTRY_DSN=https://...@sentry.io/...
+SENTRY_DSN=your-sentry-dsn-here
 
 # Performance
 WORKERS=4  # Number of uvicorn workers

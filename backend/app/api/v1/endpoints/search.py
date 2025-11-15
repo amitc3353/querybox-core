@@ -536,7 +536,26 @@ async def hybrid_search(
             logger.info("hybrid_search_using_multi_query", query=query.query[:100])
 
             # Get hybrid search service (required for Multi-Query RAG)
-            hybrid_search_service = get_hybrid_search_service(db, embedding_service)
+            # Import required services
+            from app.services.search.bm25_search_service import get_bm25_search_service
+            from app.services.search.vector_search_service import get_vector_search_service as get_vector_svc
+            from app.services.search.rrf_ranker import get_rrf_ranker
+            from app.services.search.reranking_pipeline import get_reranking_pipeline
+
+            # Instantiate all required services
+            bm25_service = get_bm25_search_service(db)
+            vector_service = get_vector_svc(db, embedding_service)
+            rrf_ranker = get_rrf_ranker()
+            reranking_pipeline = get_reranking_pipeline()
+
+            # Create hybrid search service with all dependencies
+            hybrid_search_service = get_hybrid_search_service(
+                db=db,
+                bm25_service=bm25_service,
+                vector_service=vector_service,
+                rrf_ranker=rrf_ranker,
+                reranking_pipeline=reranking_pipeline
+            )
 
             # Initialize Redis client for caching (optional)
             redis_client = None
@@ -611,17 +630,24 @@ async def hybrid_search(
 
                 total_time_ms = int((time.time() - start_time) * 1000)
 
-                return SearchResponseWithCitations(
-                    success=response.success,
-                    query=response.query,
-                    total_results=response.total_results,
-                    returned_results=len(enriched_results),
-                    results=enriched_results,
-                    processing_time_ms=total_time_ms,
-                    citations_enabled=True,
-                    filters_applied=response.filters_applied,
-                    reranking_metadata=response.reranking_metadata if hasattr(response, 'reranking_metadata') else None
-                )
+                # Build response with citations, preserving multi_query_metadata if present
+                response_data = {
+                    "success": response.success,
+                    "query": response.query,
+                    "total_results": response.total_results,
+                    "returned_results": len(enriched_results),
+                    "results": enriched_results,
+                    "processing_time_ms": total_time_ms,
+                    "citations_enabled": True,
+                    "filters_applied": response.filters_applied,
+                    "reranking_metadata": response.reranking_metadata if hasattr(response, 'reranking_metadata') else None
+                }
+
+                # Include multi_query_metadata if present (Phase 5: Multi-Query RAG)
+                if hasattr(response, 'multi_query_metadata') and response.multi_query_metadata:
+                    response_data["multi_query_metadata"] = response.multi_query_metadata
+
+                return SearchResponseWithCitations(**response_data)
 
             except Exception as e:
                 logger.error(
@@ -639,17 +665,24 @@ async def hybrid_search(
 
                 total_time_ms = int((time.time() - start_time) * 1000)
 
-                return SearchResponseWithCitations(
-                    success=response.success,
-                    query=response.query,
-                    total_results=response.total_results,
-                    returned_results=len(enriched_results),
-                    results=enriched_results,
-                    processing_time_ms=total_time_ms,
-                    citations_enabled=False,
-                    filters_applied=response.filters_applied,
-                    reranking_metadata=response.reranking_metadata if hasattr(response, 'reranking_metadata') else None
-                )
+                # Build response, preserving multi_query_metadata if present
+                response_data = {
+                    "success": response.success,
+                    "query": response.query,
+                    "total_results": response.total_results,
+                    "returned_results": len(enriched_results),
+                    "results": enriched_results,
+                    "processing_time_ms": total_time_ms,
+                    "citations_enabled": False,
+                    "filters_applied": response.filters_applied,
+                    "reranking_metadata": response.reranking_metadata if hasattr(response, 'reranking_metadata') else None
+                }
+
+                # Include multi_query_metadata if present (Phase 5: Multi-Query RAG)
+                if hasattr(response, 'multi_query_metadata') and response.multi_query_metadata:
+                    response_data["multi_query_metadata"] = response.multi_query_metadata
+
+                return SearchResponseWithCitations(**response_data)
 
         # No citations requested
         from app.schemas.search import SearchResultItemWithCitations
@@ -891,17 +924,24 @@ async def unified_search(
 
                 total_time_ms = int((time.time() - start_time) * 1000)
 
-                return SearchResponseWithCitations(
-                    success=response.success,
-                    query=response.query,
-                    total_results=response.total_results,
-                    returned_results=len(enriched_results),
-                    results=enriched_results,
-                    processing_time_ms=total_time_ms,
-                    citations_enabled=False,
-                    filters_applied=response.filters_applied,
-                    reranking_metadata=response.reranking_metadata if hasattr(response, 'reranking_metadata') else None
-                )
+                # Build response, preserving multi_query_metadata if present
+                response_data = {
+                    "success": response.success,
+                    "query": response.query,
+                    "total_results": response.total_results,
+                    "returned_results": len(enriched_results),
+                    "results": enriched_results,
+                    "processing_time_ms": total_time_ms,
+                    "citations_enabled": False,
+                    "filters_applied": response.filters_applied,
+                    "reranking_metadata": response.reranking_metadata if hasattr(response, 'reranking_metadata') else None
+                }
+
+                # Include multi_query_metadata if present (Phase 5: Multi-Query RAG)
+                if hasattr(response, 'multi_query_metadata') and response.multi_query_metadata:
+                    response_data["multi_query_metadata"] = response.multi_query_metadata
+
+                return SearchResponseWithCitations(**response_data)
 
         # No citations requested - convert to SearchResponseWithCitations format
         from app.schemas.search import SearchResultItemWithCitations
