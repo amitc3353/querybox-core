@@ -1,0 +1,247 @@
+QUERYBOX CORE - MEMORY SYSTEMS ARCHITECTURE
+=============================================
+
+CURRENT STATE: Single-Turn Stateless Architecture
+==================================================
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                        CLIENT REQUEST                               │
+│                  (Query only, no conversation ID)                   │
+└────────────────────────────┬────────────────────────────────────────┘
+                             │
+                             ▼
+        ┌────────────────────────────────────────┐
+        │      API LAYER (Stateless)             │
+        ├────────────────────────────────────────┤
+        │ POST /api/v1/answer                    │
+        │ POST /api/v1/search/...                │
+        │                                         │
+        │ ❌ No conversation_id field            │
+        │ ❌ No previous_messages field          │
+        │ ❌ No session tracking                 │
+        └────────────────┬───────────────────────┘
+                         │
+        ┌────────────────┼───────────────────┐
+        │                │                   │
+        ▼                ▼                   ▼
+    ┌─────────┐  ┌──────────────┐  ┌──────────────────┐
+    │  Cache  │  │   Service    │  │   Database       │
+    │(Redis)  │  │   Layer      │  │   (PostgreSQL)   │
+    ├─────────┤  ├──────────────┤  ├──────────────────┤
+    │Answer   │  │Answer        │  │documents         │
+    │1-hour   │  │SearchService │  │document_texts    │
+    │TTL      │  │Verification  │  │embeddings        │
+    │         │  │Citation      │  │(NO conversations)│
+    │❌ No    │  │              │  │                  │
+    │conv     │  │❌ No conv    │  │❌ No conv tables │
+    │store    │  │history       │  │                  │
+    └────┬────┘  └──────┬───────┘  └────────┬─────────┘
+         │               │                   │
+         │       ┌───────┴─────────┐         │
+         │       ▼                 ▼         │
+         │    ┌──────────────────────────┐  │
+         │    │  Document Retrieval      │  │
+         │    │  - Keyword search        │  │
+         │    │  - Vector search (BM25)  │  │
+         │    │  - Hybrid search         │  │
+         │    │                          │  │
+         │    │  6000 token context:     │  │
+         │    │  [Document passages]     │  │
+         │    │  (NOT conversation!)     │  │
+         │    └──────────────┬───────────┘  │
+         │                   │              │
+         │                   ▼              │
+         │            ┌────────────────┐   │
+         │            │  LLM Prompt    │   │
+         │            │  Generation    │   │
+         │            │                │   │
+         │            │ Context:       │   │
+         │            │ - Query: "X?"  │   │
+         │            │ - Passages: [] │   │
+         │            │ (No history!)  │   │
+         │            └────────┬───────┘   │
+         │                     │           │
+         │                     ▼           │
+         │            ┌────────────────┐   │
+         │            │  Ollama LLM    │   │
+         │            │  qwen2:7b      │   │
+         │            └────────┬───────┘   │
+         │                     │           │
+         │ ┌───────────────────┼───────────┘
+         │ │                   │
+         ▼ ▼                   ▼
+    ┌────────────────────────────────────────┐
+    │         RESPONSE (Final)                │
+    ├────────────────────────────────────────┤
+    │- answer: "Based on passages..."        │
+    │- citations: [...]                      │
+    │- propositions: [...]                   │
+    │- confidence: 0.95                      │
+    │                                         │
+    │❌ NO: previous context, history,       │
+    │❌ NO: conversation_id tracking         │
+    │❌ NO: message persistence              │
+    └────────────────┬───────────────────────┘
+                     │
+                     ▼
+        ┌─────────────────────────────┐
+        │  CLIENT (receives response) │
+        │  [Request ends - stateless] │
+        └─────────────────────────────┘
+
+
+WHAT EXISTS
+===========
+
+✅ Document Storage
+   ├── documents (metadata, versions, versioning)
+   ├── document_texts (full extracted text)
+   ├── embeddings (vector representations)
+   └── document_versions (version history)
+
+✅ Search & Retrieval
+   ├── Keyword search (PostgreSQL full-text)
+   ├── Vector search (pgvector cosine similarity)
+   └── Hybrid search (BM25 + vector + RRF)
+
+✅ Answer Generation
+   ├── Query processing
+   ├── Passage retrieval
+   ├── LLM prompting (Ollama)
+   └── Citation extraction
+
+✅ Quality Features
+   ├── Verification (Chain-of-Verification)
+   ├── Citation confidence scoring
+   ├── Hallucination detection
+   └── Verification abstention
+
+✅ Caching
+   └── Redis answer cache (1-hour TTL)
+
+✅ Multi-tenancy
+   └── workspace_id for tenant isolation
+
+
+WHAT DOESN'T EXIST
+==================
+
+❌ Conversation Management
+   ├── No conversations table
+   ├── No conversation_id field
+   └── No conversation lifecycle
+
+❌ Message Storage
+   ├── No messages table
+   ├── No message persistence
+   └── No message indexing
+
+❌ Session Tracking
+   ├── No sessions table
+   ├── No session_id field
+   └── No session lifecycle
+
+❌ Multi-Turn Support
+   ├── No history loading
+   ├── No context accumulation
+   └── No conversation continuation
+
+❌ Interaction Tracking
+   ├── No user feedback storage
+   ├── No question-answer pair history
+   └── No interaction analytics
+
+❌ Context Management
+   ├── No conversation context table
+   ├── No memory persistence
+   └── No context accumulation
+
+
+MISSING ARCHITECTURE FOR CONVERSATIONS
+======================================
+
+To support multi-turn conversations, you would need:
+
+┌─────────────────────────────────────────────────────────┐
+│              CONVERSATION EXTENSION LAYER                │
+├─────────────────────────────────────────────────────────┤
+│                                                          │
+│  Database:                                              │
+│  ┌──────────────┐  ┌────────────┐  ┌───────────────┐  │
+│  │ conversations│  │ messages   │  │conversation  │  │
+│  ├──────────────┤  ├────────────┤  │_context      │  │
+│  │id            │  │id          │  ├───────────────┤  │
+│  │user_id       │  │conv_id (FK)│  │id             │  │
+│  │workspace_id  │  │role        │  │conversation_id│  │
+│  │created_at    │  │content     │  │context_data   │  │
+│  │updated_at    │  │timestamp   │  │vectors        │  │
+│  │archived      │  │embedding   │  │metadata       │  │
+│  └──────────────┘  └────────────┘  └───────────────┘  │
+│                                                          │
+│  API Endpoints:                                         │
+│  POST   /conversations           ← create               │
+│  GET    /conversations/{id}      ← get history         │
+│  POST   /conversations/{id}/msg  ← add message         │
+│  DELETE /conversations/{id}      ← archive             │
+│                                                          │
+│  Service Logic:                                         │
+│  1. Load previous messages from DB                      │
+│  2. Build conversation context (last N messages)        │
+│  3. Include in LLM prompt (within token limit)         │
+│  4. Generate response                                  │
+│  5. Persist user message + response                    │
+│                                                          │
+└─────────────────────────────────────────────────────────┘
+
+
+DATA FLOW DIAGRAM
+=================
+
+CURRENT (Single-Turn):
+    Query → Search → Passages → Prompt → LLM → Answer ✓
+                                              ↓
+                                            Cache (1hr)
+                                              ↓
+                                          [DONE]
+
+NEEDED (Multi-Turn):
+    Query → Load History → Augment Query → Search → Passages
+                ↓                                        ↓
+            [DB]                                    Merge with
+            ↓                                       conversation
+        History                                    context
+        Messages                                       ↓
+                                                   Prompt + History
+                                                       ↓
+                                                    Ollama LLM
+                                                       ↓
+                                                  Answer ✓
+                                                       ↓
+                                    ┌───────────────────┬────────┐
+                                    ↓                   ↓        ↓
+                                 Cache          Persist      Update
+                                (Redis)         Message      Context
+                                (1hr)           (DB)         (DB)
+
+
+IMPORTANT CONSTRAINTS
+====================
+
+1. Context Window: 6000 tokens max
+   - Currently: Document passages only
+   - For multi-turn: passages + conversation history
+   - This will reduce passage room if history included
+
+2. LLM Model: Ollama qwen2:7b
+   - Supports multi-turn in theory
+   - Needs conversation structure in prompt
+
+3. Caching Strategy:
+   - Currently: Hash(query, document_ids, workspace_id)
+   - For multi-turn: Would need Hash(..., conversation_id)
+
+4. Performance Impact:
+   - Loading conversation history = DB query overhead
+   - Context assembly = token counting overhead
+   - Message persistence = write latency
+
